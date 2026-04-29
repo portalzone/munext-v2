@@ -26,6 +26,21 @@ services:
     networks:
       - munext
 
+  # Next.js frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/frontend/Dockerfile
+    container_name: munext_frontend
+    ports:
+      - "3001:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+    depends_on:
+      - nginx
+    networks:
+      - munext
+
   # PostgreSQL database
   postgres:
     image: postgres:16-alpine
