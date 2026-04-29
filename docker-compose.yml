@@ -1,0 +1,49 @@
+services:
+
+  # Laravel PHP-FPM application
+  app:
+    build:
+      context: ./backend
+      dockerfile: ../docker/app/Dockerfile
+    container_name: munext_app
+    working_dir: /var/www
+    volumes:
+      - ./backend:/var/www
+    networks:
+      - munext
+
+  # Nginx web server — routes HTTP traffic to the app container
+  nginx:
+    image: nginx:alpine
+    container_name: munext_nginx
+    ports:
+      - "8000:80"
+    volumes:
+      - ./backend:/var/www
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - app
+    networks:
+      - munext
+
+  # PostgreSQL database
+  postgres:
+    image: postgres:16-alpine
+    container_name: munext_postgres
+    environment:
+      POSTGRES_DB: munext
+      POSTGRES_USER: munext
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - munext
+
+networks:
+  munext:
+    driver: bridge
+
+volumes:
+  postgres_data:

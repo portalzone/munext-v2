@@ -1,0 +1,14 @@
+# Environment files — never commit these
+.env
+*.env
+
+# macOS
+.DS_Store
+
+# Docker volumes and overrides
+docker-compose.override.yml
+
+# Terraform (for later projects)
+*.tfstate
+*.tfstate.backup
+*.pem
