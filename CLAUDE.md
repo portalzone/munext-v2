@@ -23,7 +23,7 @@ By the end of Project 1 I should be able to:
 
 ## Tech stack
 - Backend: Laravel 13, PostgreSQL, Sanctum, Pest, Spatie Activity Log
-- Frontend: Next.js 16, TypeScript, Tailwind CSS, TanStack Query, Recharts
+- Frontend: Next.js 16.2.4, TypeScript, Tailwind CSS, TanStack Query, Recharts
 - DevOps: Docker, Docker Compose, GitHub
 
 
