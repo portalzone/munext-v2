@@ -88,11 +88,11 @@ it('allows the job owner to update application status', function () {
     $app      = Application::create(['student_id' => $student->id, 'job_id' => $job->id, 'status' => 'pending']);
 
     $response = $this->actingAs($employer)->putJson("/api/v1/jobs/{$job->id}/applicants/{$app->id}", [
-        'status' => 'accepted',
+        'status' => 'shortlisted',
     ]);
 
     $response->assertStatus(200)
-        ->assertJsonPath('data.status', 'accepted');
+        ->assertJsonPath('data.status', 'shortlisted');
 });
 
 it('prevents invalid status values', function () {
@@ -102,7 +102,7 @@ it('prevents invalid status values', function () {
     $app      = Application::create(['student_id' => $student->id, 'job_id' => $job->id, 'status' => 'pending']);
 
     $response = $this->actingAs($employer)->putJson("/api/v1/jobs/{$job->id}/applicants/{$app->id}", [
-        'status' => 'hired',
+        'status' => 'promoted',
     ]);
 
     $response->assertStatus(422);

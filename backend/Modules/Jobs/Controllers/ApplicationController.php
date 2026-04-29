@@ -80,7 +80,7 @@ class ApplicationController extends Controller
         }
 
         $validated = $request->validate([
-            'status' => ['required', 'in:pending,reviewed,accepted,rejected'],
+            'status' => ['required', 'in:pending,reviewed,shortlisted,rejected,hired'],
         ]);
 
         $application->update($validated);

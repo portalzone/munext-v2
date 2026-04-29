@@ -20,12 +20,13 @@ By the end of Project 1 I should be able to:
 3. Write and run Pest tests and interpret the output
 4. Explain what TanStack Query does and why it replaces raw fetch
 5. Run the full app locally with docker-compose up
+6. Explain how pure-PHP ML algorithms work and why they do not need Python
 
 ## Tech stack
 - Backend: Laravel 13, PostgreSQL, Sanctum, Pest, Spatie Activity Log
 - Frontend: Next.js 16.2.4, TypeScript, Tailwind CSS, TanStack Query, Recharts
 - DevOps: Docker, Docker Compose, GitHub
-
+- ML: Pure PHP — no Python, no external ML library
 
 ## Ground Rules — Read Before Every Session
 
@@ -120,7 +121,13 @@ munext-v2/
         Models/
         Routes/
         Tests/
+      ML/
+        Controllers/
+        Routes/
+        Tests/
     app/
+      Services/
+        MLService.php    ← all 5 ML algorithms live here
     config/
     database/
     routes/
@@ -128,6 +135,12 @@ munext-v2/
     app/
       (auth)/
       (dashboard)/
+        jobs/            ← job listing with pagination + filters
+        jobs/[id]/       ← job detail with skill match chart
+        profile/         ← student profile + strength score
+        employer/        ← employer dashboard
+        employer/applicants/[jobId]/ ← view applicants per job
+        admin/           ← admin panel (users + jobs + ML dashboard)
       api/
     components/
     lib/
@@ -138,13 +151,16 @@ munext-v2/
   README.md
 ```
 
-## Database — key tables
+## Database — all tables
 ```
-users           id, name, email, password, role (student|employer|admin)
-student_profiles user_id, program, gpa, graduation_year, skills (json array)
-employers       id, user_id, company_name, industry
-job_postings    id, employer_id, title, description, skills_required (json), experience_level
-applications    id, student_id, job_id, status, applied_at
+users             id, name, email, password, role (student|employer|admin)
+student_profiles  user_id, program, gpa, graduation_year, skills (json), resume_path
+employers         id, user_id, company_name, industry
+job_postings      id, employer_id, title, description, skills_required (json),
+                  experience_level, category, salary_min, salary_max, is_active
+applications      id, student_id, job_id, status, cover_letter, applied_at
+bookmarks         id, student_id, job_id, created_at
+notifications     id, user_id, type, message, read_at, created_at
 ```
 
 ## API conventions
@@ -153,17 +169,155 @@ applications    id, student_id, job_id, status, applied_at
 - Responses: { data: ..., message: ..., status: ... }
 - Errors: { error: ..., message: ..., status: ... }
 - All endpoints must have a corresponding Pest test before being considered done
+- Pagination: ?page=1&per_page=15 on all list endpoints
+- Filtering: ?category=&salary_min=&salary_max=&skills= on job listing
+
+## Professional Job Board Features
+These are the features MUNext v2 must have to be considered production-quality:
+
+### Student-facing
+- [ ] Job listing with pagination (15 per page)
+- [ ] Filter jobs by: category, salary range, experience level, skills
+- [ ] Search jobs by keyword (title + description)
+- [ ] Job detail page with Recharts skill match bar chart
+- [ ] Apply with cover letter (required — prevents spam/one-click abuse)
+- [ ] View application status (pending, reviewed, shortlisted, rejected, hired)
+- [ ] Bookmark/save jobs for later
+- [ ] Student profile with skills tagging
+- [ ] Profile strength score display (powered by ML Algorithm 2)
+- [ ] Application success predictor per job (powered by ML Algorithm 4)
+- [ ] Job recommendations based on profile skills
+
+### Employer-facing
+- [ ] Post new jobs with title, description, skills required, category, salary range
+- [ ] Edit and deactivate job postings
+- [ ] View all applicants per job with their profile and cover letter
+- [ ] Change application status (shortlist, reject, hire)
+- [ ] Hiring funnel chart per job (powered by ML Algorithm 3)
+- [ ] View skill match score per applicant
+
+### Admin-facing
+- [ ] User management: list, view, deactivate users
+- [ ] Job moderation: approve, deactivate, delete job postings
+- [ ] ML analytics dashboard with all 5 algorithm outputs
+- [ ] Platform-wide stats: total users, jobs, applications, categories
+
+### Platform features
+- [ ] In-app notifications (application status changes, new job matches)
+- [ ] Email notifications (via Laravel mail — queue-based, no paid service)
+- [ ] Activity log (Spatie) on all sensitive actions
+- [ ] Rate limiting on apply endpoint (prevent spam)
+
+## Five ML Algorithms — Pure PHP, No Python
+
+All algorithms live in `backend/app/Services/MLService.php`.
+They query the PostgreSQL database directly via Eloquent and return arrays.
+No external ML library. No Python. No paid API.
+
+### Algorithm 1 — Job-Student Skill Match Score (Jaccard Similarity)
+**What it does:** Scores how well a student's skills match a job's required skills.
+**Math:** Jaccard = |intersection| / |union| × 100
+- Input: student skills array, job skills_required array (both lowercased)
+- Output: score 0–100, matched_skills[], missing_skills[], extra_skills[]
+- Endpoint: GET /api/v1/ml/match/{jobId}
+- Used on: job detail page (bar chart), applicant list (per-applicant score)
+
+### Algorithm 2 — Student Profile Strength Score
+**What it does:** Scores how complete and competitive a student's profile is.
+**Math:** Weighted composite (4 components, sum = 100)
+- Profile completeness (30%): fields filled in (name, program, gpa, graduation_year)
+- Skills count (25%): 0 skills = 0, 10+ skills = 25
+- Resume uploaded (20%): 0 or 20
+- Activity score (25%): based on number of applications submitted
+- Output: total score 0–100, breakdown by component, label (Weak/Fair/Good/Strong/Excellent)
+- Endpoint: GET /api/v1/ml/profile-strength
+- Used on: student profile page (score badge + breakdown)
+
+### Algorithm 3 — Employer Hiring Funnel Analytics
+**What it does:** Shows an employer how their job postings are converting applicants.
+**Math:** Conversion rates between pipeline stages
+- Stages: applied → reviewed → shortlisted → hired
+- Conversion rate per stage: (count_at_stage / total_applied) × 100
+- Output: per-job funnel data, drop-off rates, average time-in-stage
+- Endpoint: GET /api/v1/ml/funnel (employer only)
+- Used on: employer dashboard (Recharts funnel/bar chart)
+
+### Algorithm 4 — Application Success Predictor
+**What it does:** Estimates the probability that a student's application will succeed.
+**Math:** Weighted probability (3 factors)
+- Profile strength score (25%) — from Algorithm 2
+- Skill match score (35%) — from Algorithm 1
+- Employer selectivity (40%) — employer's historical hire rate for this job category
+- Output: probability 0–100, confidence label, top 3 improvement suggestions
+- Endpoint: GET /api/v1/ml/predict/{jobId}
+- Used on: job detail page (before or after applying)
+
+### Algorithm 5 — Job Market Trend Analysis
+**What it does:** Analyses what skills are in demand and how job categories trend over time.
+**Math:** EWMA (Exponentially Weighted Moving Average) for trend smoothing
+- Skill frequency: count skill occurrences across all active jobs
+- EWMA trend: α = 0.3, applied over weekly job posting counts per category
+- Salary trend: average salary_min/salary_max by category
+- Output: top N in-demand skills, trending categories, salary ranges
+- Endpoint: GET /api/v1/ml/trends (admin only)
+- Used on: admin ML dashboard (Recharts line + bar charts)
+
+## ML Endpoints Summary
+```
+GET  /api/v1/ml/match/{jobId}      student — Jaccard skill match
+GET  /api/v1/ml/profile-strength   student — profile strength score
+GET  /api/v1/ml/predict/{jobId}    student — success predictor
+GET  /api/v1/ml/funnel             employer — hiring funnel
+GET  /api/v1/ml/trends             admin — market trend analysis
+```
 
 ## Pest testing rules
 - Every endpoint gets at least 3 tests: happy path, unauthenticated, invalid input
 - Run tests with: php artisan test
 - Tests live in Modules/{ModuleName}/Tests/
 - Use Pest's fluent syntax — not PHPUnit style
+- ML endpoints also need: role-guard test, edge case (no data/empty profile)
 
 ## TypeScript rules
 - Every API response must have a TypeScript interface in lib/types.ts
 - No use of `any` type anywhere — if you do not know the type, ask
 - All props must be typed — no untyped component props
+
+## Current build status (as of 2026-04-29)
+### Done
+- [x] Laravel 13 modular scaffold (Modules/Auth, Jobs, Students)
+- [x] PSR-4 autoloading for Modules namespace
+- [x] Docker: app, nginx, postgres, frontend containers
+- [x] Auth module: register, login, me, logout + Pest tests
+- [x] Jobs module: CRUD, applications, skill match + Pest tests
+- [x] Students module: profile CRUD + Pest tests
+- [x] Next.js 16 frontend with TypeScript + Tailwind
+- [x] TanStack Query for all data fetching
+- [x] Role-aware Header component
+- [x] Login + Register pages (split layout, professional)
+- [x] Jobs listing page (students)
+- [x] Job detail page with Recharts skill match bar chart
+- [x] Student profile page (create/edit with skills tagging)
+- [x] Employer dashboard (post/edit/delete jobs)
+- [x] 46 Pest tests passing, 110 assertions
+
+### In progress / pending
+- [ ] Schema: add category, salary_min, salary_max to job_postings
+- [ ] Schema: add resume_path to student_profiles
+- [ ] Schema: create bookmarks table
+- [ ] Schema: create notifications table
+- [ ] MLService.php with all 5 algorithms
+- [ ] ML Module (Controller + Routes + Tests)
+- [ ] Jobs listing: pagination + filters + search
+- [ ] Application flow: cover letter required
+- [ ] Employer applicant view UI
+- [ ] Student bookmark jobs feature
+- [ ] Profile strength UI (Algorithm 2 display)
+- [ ] Success predictor UI on job detail (Algorithm 4)
+- [ ] Admin dashboard (users + jobs + ML dashboard)
+- [ ] In-app notifications
+- [ ] README with setup instructions
+- [ ] GitHub tag: v1.0
 
 ## When I am stuck
 If I am stuck on something for more than 15 minutes, I will tell you.
@@ -175,17 +329,25 @@ When I open a new session, ask me:
 "What did we build last session? What is on the sprint plan for today?"
 This keeps me accountable and connected to the plan.
 
-## Sprint plan reference
-Week 1:  Laravel scaffold + Pest setup + Modular structure
-Week 2:  Next.js 16 + TypeScript setup + Auth flow
-Weeks 3–6: Core features + TanStack Query + skill matcher
-Weeks 7–8: Docker + integration + README + tag v1.0
+## Sprint plan reference (updated)
+Week 1:  Laravel scaffold + Pest setup + Modular structure ✅
+Week 2:  Next.js 16 + TypeScript setup + Auth flow ✅
+Week 3:  Jobs module, Students module, Recharts skill chart ✅
+Week 4:  Applications, Employer dashboard, Docker full stack ✅
+Week 5:  Schema additions + 5 ML algorithms (pure PHP) + ML endpoints
+Week 6:  Pagination + filters + cover letter flow + employer applicant view
+Week 7:  Admin dashboard + bookmarks + notifications + profile strength UI
+Week 8:  README + integration tests + GitHub tag v1.0
 
 ## Definition of done for Project 1
-- [ ] All Laravel modules (Auth, Jobs, Students) with full Pest test coverage
+- [ ] All Laravel modules (Auth, Jobs, Students, ML) with full Pest test coverage
 - [ ] Next.js frontend consuming all API endpoints with TypeScript types
 - [ ] TanStack Query handling all data fetching
 - [ ] Skill matching results page with Recharts chart
+- [ ] All 5 ML algorithms working and tested
+- [ ] Professional job board features (pagination, filters, cover letter, bookmarks)
+- [ ] Employer applicant management with status updates
+- [ ] Admin dashboard with ML analytics
 - [ ] docker-compose up starts the full app cleanly
 - [ ] README with setup instructions
 - [ ] GitHub tag: v1.0

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useMutation } from '@tanstack/react-query'
 import { api } from '@/lib/api'
@@ -8,6 +8,12 @@ import { ApiError } from '@/lib/types'
 
 export default function RegisterPage() {
   const router = useRouter()
+
+  useEffect(() => {
+    if (localStorage.getItem('token')) {
+      router.push('/dashboard')
+    }
+  }, [router])
 
   const [form, setForm] = useState({
     name: '',

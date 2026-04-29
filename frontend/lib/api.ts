@@ -48,6 +48,9 @@ export const api = {
 
     me: () =>
       request<ApiResponse<User>>('/auth/me'),
+
+    logout: () =>
+      request<ApiResponse<null>>('/auth/logout', { method: 'POST' }),
   },
 
   jobs: {

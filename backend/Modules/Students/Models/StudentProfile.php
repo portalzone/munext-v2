@@ -13,6 +13,7 @@ class StudentProfile extends Model
         'gpa',
         'graduation_year',
         'skills',
+        'resume_path',
     ];
 
     protected $casts = [
