@@ -10,6 +10,7 @@ import {
   Application,
   StudentProfile,
   User,
+  PlatformStats,
   SkillMatch,
   ProfileStrength,
   SuccessPredictor,
@@ -79,8 +80,8 @@ export const api = {
     list: (filters?: JobFilters) =>
       request<JobListResponse>(`/jobs${buildQuery({ ...filters } as Record<string, string | number | undefined>)}`),
 
-    myJobs: () =>
-      request<ApiResponse<JobPosting[]>>('/jobs/my-jobs'),
+    myJobs: (params?: { sort?: string; page?: number; per_page?: number }) =>
+      request<JobListResponse>(`/jobs/my-jobs${buildQuery({ ...params } as Record<string, string | number | undefined>)}`),
 
     get: (id: number) =>
       request<ApiResponse<JobPosting>>(`/jobs/${id}`),
@@ -140,6 +141,26 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
+  },
+
+  admin: {
+    stats: () =>
+      request<ApiResponse<PlatformStats>>('/admin/stats'),
+
+    users: (params?: { role?: string; search?: string; page?: number }) =>
+      request<JobListResponse & { data: User[] }>(`/admin/users${buildQuery({ ...params } as Record<string, string | number | undefined>)}`),
+
+    toggleUser: (id: number) =>
+      request<ApiResponse<User>>(`/admin/users/${id}/toggle`, { method: 'PUT' }),
+
+    jobs: (params?: { search?: string; status?: string; page?: number }) =>
+      request<JobListResponse>(`/admin/jobs${buildQuery({ ...params } as Record<string, string | number | undefined>)}`),
+
+    toggleJob: (id: number) =>
+      request<ApiResponse<JobPosting>>(`/admin/jobs/${id}/toggle`, { method: 'PUT' }),
+
+    deleteJob: (id: number) =>
+      request<ApiResponse<null>>(`/admin/jobs/${id}`, { method: 'DELETE' }),
   },
 
   ml: {

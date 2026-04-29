@@ -7,11 +7,32 @@ import { JobPosting } from '@/lib/types'
 
 type JobForm = Omit<JobPosting, 'id' | 'employer_id' | 'created_at' | 'updated_at' | 'employer'>
 
+const CATEGORIES = [
+  'Software Development',
+  'Web Development',
+  'IT & Systems',
+  'Data Science & AI',
+  'Cybersecurity',
+  'DevOps & Cloud',
+  'Engineering',
+  'Design & UX',
+  'Marketing',
+  'Finance & Accounting',
+  'Healthcare',
+  'Education & Research',
+  'Sales & Business',
+  'Other',
+]
+
 const EMPTY_FORM: JobForm = {
   title: '',
   description: '',
   skills_required: [],
   experience_level: 'entry',
+  category: null,
+  salary_min: null,
+  salary_max: null,
+  is_active: true,
 }
 
 const LEVEL_LABELS: Record<JobPosting['experience_level'], string> = {
@@ -33,10 +54,12 @@ export default function EmployerDashboard() {
   const [form, setForm] = useState<JobForm>(EMPTY_FORM)
   const [skillInput, setSkillInput] = useState('')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [sort, setSort] = useState('newest')
+  const [page, setPage] = useState(1)
 
   const { data, isLoading } = useQuery({
-    queryKey: ['my-jobs'],
-    queryFn: () => api.jobs.myJobs(),
+    queryKey: ['my-jobs', sort, page],
+    queryFn: () => api.jobs.myJobs({ sort, page, per_page: 10 }),
   })
 
   const createMutation = useMutation({
@@ -46,6 +69,12 @@ export default function EmployerDashboard() {
       resetForm()
     },
     onError: () => setErrorMessage('Failed to create job posting.'),
+  })
+
+  const toggleMutation = useMutation({
+    mutationFn: ({ id, is_active }: { id: number; is_active: boolean }) =>
+      api.jobs.update(id, { is_active }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['my-jobs'] }),
   })
 
   const updateMutation = useMutation({
@@ -76,6 +105,10 @@ export default function EmployerDashboard() {
       description:      job.description,
       skills_required:  job.skills_required,
       experience_level: job.experience_level,
+      category:         job.category,
+      salary_min:       job.salary_min,
+      salary_max:       job.salary_max,
+      is_active:        job.is_active,
     })
     setEditingJob(job)
     setShowForm(true)
@@ -97,8 +130,9 @@ export default function EmployerDashboard() {
     setForm((prev) => ({ ...prev, skills_required: prev.skills_required.filter((s) => s !== skill) }))
   }
 
-  const jobs = data?.data ?? []
-  const isPending = createMutation.isPending || updateMutation.isPending
+  const jobs       = data?.data ?? []
+  const pagination = data?.pagination
+  const isPending  = createMutation.isPending || updateMutation.isPending
 
   return (
     <main className="min-h-screen bg-gray-50 p-8">
@@ -108,16 +142,30 @@ export default function EmployerDashboard() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Employer Dashboard</h1>
-            <p className="text-sm text-gray-500 mt-0.5">{jobs.length} {jobs.length === 1 ? 'job posting' : 'job postings'}</p>
+            <p className="text-sm text-gray-500 mt-0.5">
+              {pagination ? `${pagination.total} ${pagination.total === 1 ? 'job posting' : 'job postings'}` : ''}
+            </p>
           </div>
-          {!showForm && (
-            <button
-              onClick={() => setShowForm(true)}
-              className="bg-[#1a3a5c] text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#15304d] transition-colors"
+          <div className="flex items-center gap-3">
+            <select
+              value={sort}
+              onChange={e => { setSort(e.target.value); setPage(1) }}
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-[#1a3a5c]"
             >
-              + Post a Job
-            </button>
-          )}
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="active">Active first</option>
+              <option value="inactive">Inactive first</option>
+            </select>
+            {!showForm && (
+              <button
+                onClick={() => setShowForm(true)}
+                className="bg-[#1a3a5c] text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#15304d] transition-colors"
+              >
+                + Post a Job
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Job Form */}
@@ -170,6 +218,48 @@ export default function EmployerDashboard() {
                   <option value="mid">Mid Level</option>
                   <option value="senior">Senior Level</option>
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                <select
+                  name="category"
+                  value={form.category ?? ''}
+                  onChange={(e) => setForm(prev => ({ ...prev, category: e.target.value || null }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a3a5c]"
+                >
+                  <option value="">Select a category (optional)</option>
+                  {CATEGORIES.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Min Salary ($)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1000}
+                    value={form.salary_min ?? ''}
+                    onChange={(e) => setForm(prev => ({ ...prev, salary_min: e.target.value ? Number(e.target.value) : null }))}
+                    placeholder="e.g. 50000"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a3a5c]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Max Salary ($)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1000}
+                    value={form.salary_max ?? ''}
+                    onChange={(e) => setForm(prev => ({ ...prev, salary_max: e.target.value ? Number(e.target.value) : null }))}
+                    placeholder="e.g. 80000"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a3a5c]"
+                  />
+                </div>
               </div>
 
               <div>
@@ -242,9 +332,31 @@ export default function EmployerDashboard() {
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
                     <h2 className="text-lg font-semibold text-gray-900">{job.title}</h2>
-                    <p className="text-sm text-gray-500 mt-0.5">
-                      Posted {new Date(job.created_at).toLocaleDateString()}
-                    </p>
+                    <div className="flex flex-wrap items-center gap-2 mt-0.5 text-sm text-gray-500">
+                      <span>Posted {new Date(job.created_at).toLocaleDateString()}</span>
+                      {job.category && (
+                        <>
+                          <span className="text-gray-300">·</span>
+                          <span>{job.category}</span>
+                        </>
+                      )}
+                      {(job.salary_min || job.salary_max) && (
+                        <>
+                          <span className="text-gray-300">·</span>
+                          <span className="text-green-600 font-medium">
+                            {job.salary_min && job.salary_max
+                              ? `$${(job.salary_min / 1000).toFixed(0)}k – $${(job.salary_max / 1000).toFixed(0)}k`
+                              : job.salary_min
+                              ? `From $${(job.salary_min / 1000).toFixed(0)}k`
+                              : `Up to $${(job.salary_max! / 1000).toFixed(0)}k`}
+                          </span>
+                        </>
+                      )}
+                      <span className="text-gray-300">·</span>
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${job.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                        {job.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
                   </div>
                   <span className={`shrink-0 text-xs font-medium px-2.5 py-1 rounded-full ${LEVEL_COLORS[job.experience_level]}`}>
                     {LEVEL_LABELS[job.experience_level]}
@@ -275,6 +387,13 @@ export default function EmployerDashboard() {
                     Edit
                   </button>
                   <button
+                    onClick={() => toggleMutation.mutate({ id: job.id, is_active: !job.is_active })}
+                    disabled={toggleMutation.isPending}
+                    className={`text-sm font-medium hover:underline disabled:opacity-50 ${job.is_active ? 'text-yellow-600' : 'text-green-600'}`}
+                  >
+                    {job.is_active ? 'Deactivate' : 'Activate'}
+                  </button>
+                  <button
                     onClick={() => deleteMutation.mutate(job.id)}
                     disabled={deleteMutation.isPending}
                     className="text-sm text-red-500 font-medium hover:underline disabled:opacity-50"
@@ -284,6 +403,29 @@ export default function EmployerDashboard() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {pagination && pagination.last_page > 1 && (
+          <div className="mt-6 flex items-center justify-center gap-2">
+            <button
+              onClick={() => setPage(p => p - 1)}
+              disabled={page <= 1}
+              className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            <span className="text-sm text-gray-500">
+              Page {pagination.current_page} of {pagination.last_page}
+            </span>
+            <button
+              onClick={() => setPage(p => p + 1)}
+              disabled={page >= pagination.last_page}
+              className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
           </div>
         )}
       </div>

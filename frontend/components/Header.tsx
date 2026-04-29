@@ -39,6 +39,10 @@ export default function Header() {
                 <a href="/employer" className="hover:text-blue-200 transition-colors">Dashboard</a>
               )}
 
+              {user.role === 'admin' && (
+                <a href="/admin" className="hover:text-blue-200 transition-colors">Admin</a>
+              )}
+
               <div className="flex items-center gap-3 border-l border-blue-400 pl-6">
                 <span className="text-blue-200">{user.name}</span>
                 <button

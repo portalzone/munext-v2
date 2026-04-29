@@ -25,6 +25,8 @@ export default function DashboardPage() {
 
     if (user.role === 'employer') {
       router.push('/employer')
+    } else if (user.role === 'admin') {
+      router.push('/admin')
     } else {
       router.push('/jobs')
     }

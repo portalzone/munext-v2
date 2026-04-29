@@ -20,10 +20,27 @@ class JobController extends Controller
             ], 403);
         }
 
-        $jobs = JobPosting::where('employer_id', $request->user()->id)->latest()->get();
+        $query = JobPosting::where('employer_id', $request->user()->id);
+
+        $sort = $request->query('sort', 'newest');
+        match ($sort) {
+            'oldest'      => $query->oldest(),
+            'active'      => $query->orderByRaw('is_active DESC, created_at DESC'),
+            'inactive'    => $query->orderByRaw('is_active ASC, created_at DESC'),
+            default       => $query->latest(),
+        };
+
+        $perPage = min((int) $request->query('per_page', 10), 50);
+        $jobs    = $query->paginate($perPage);
 
         return response()->json([
-            'data'    => $jobs,
+            'data'       => $jobs->items(),
+            'pagination' => [
+                'total'        => $jobs->total(),
+                'per_page'     => $jobs->perPage(),
+                'current_page' => $jobs->currentPage(),
+                'last_page'    => $jobs->lastPage(),
+            ],
             'message' => 'Your job postings retrieved successfully',
             'status'  => 200,
         ]);
@@ -33,8 +50,7 @@ class JobController extends Controller
     public function index(Request $request): JsonResponse
     {
         $query = JobPosting::with('employer:id,name,email')
-            ->where('is_active', true)
-            ->latest();
+            ->where('is_active', true);
 
         if ($search = $request->query('search')) {
             $query->where(function ($q) use ($search) {
@@ -58,6 +74,14 @@ class JobController extends Controller
         if ($max = $request->query('salary_max')) {
             $query->where('salary_min', '<=', (int) $max);
         }
+
+        $sort = $request->query('sort', 'newest');
+        match ($sort) {
+            'oldest'         => $query->oldest(),
+            'salary_high'    => $query->orderByRaw('salary_max DESC NULLS LAST'),
+            'salary_low'     => $query->orderByRaw('salary_min ASC NULLS LAST'),
+            default          => $query->latest(),
+        };
 
         $perPage = min((int) $request->query('per_page', 15), 50);
         $jobs    = $query->paginate($perPage);

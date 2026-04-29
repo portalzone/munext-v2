@@ -17,7 +17,22 @@ const LEVEL_COLORS: Record<JobPosting['experience_level'], string> = {
   senior: 'bg-purple-100 text-purple-700',
 }
 
-const CATEGORIES = ['Engineering', 'Design', 'Marketing', 'Finance', 'Healthcare', 'Education', 'Sales', 'Other']
+const CATEGORIES = [
+  'Software Development',
+  'Web Development',
+  'IT & Systems',
+  'Data Science & AI',
+  'Cybersecurity',
+  'DevOps & Cloud',
+  'Engineering',
+  'Design & UX',
+  'Marketing',
+  'Finance & Accounting',
+  'Healthcare',
+  'Education & Research',
+  'Sales & Business',
+  'Other',
+]
 
 function formatSalary(min: number | null, max: number | null): string | null {
   if (!min && !max) return null
@@ -152,13 +167,23 @@ export default function JobsPage() {
 
           {/* Job list */}
           <div className="flex-1 min-w-0">
-            {/* Result count */}
+            {/* Result count + sort */}
             <div className="flex items-center justify-between mb-4">
               <p className="text-sm text-gray-500">
                 {isLoading ? 'Loading...' : pagination
                   ? `${pagination.total} ${pagination.total === 1 ? 'job' : 'jobs'} found`
                   : ''}
               </p>
+              <select
+                value={filters.sort ?? 'newest'}
+                onChange={e => setFilter('sort', e.target.value as JobFilters['sort'])}
+                className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-[#1a3a5c]"
+              >
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+                <option value="salary_high">Salary: high to low</option>
+                <option value="salary_low">Salary: low to high</option>
+              </select>
             </div>
 
             {/* Loading skeletons */}

@@ -6,6 +6,17 @@ export interface User {
   name: string
   email: string
   role: 'student' | 'employer' | 'admin'
+  is_active: boolean
+}
+
+export interface PlatformStats {
+  total_users: number
+  total_students: number
+  total_employers: number
+  active_jobs: number
+  total_jobs: number
+  total_applications: number
+  total_categories: number
 }
 
 export interface AuthResponse {
@@ -52,6 +63,7 @@ export interface JobFilters {
   experience_level?: string
   salary_min?: number
   salary_max?: number
+  sort?: 'newest' | 'oldest' | 'salary_high' | 'salary_low'
   page?: number
   per_page?: number
 }
