@@ -1,7 +1,7 @@
 // All API calls to the Laravel backend go here.
 // Never call fetch() directly from a component — always go through this file.
 
-import { AuthResponse, ApiResponse, JobPosting, StudentProfile, User } from './types'
+import { AuthResponse, ApiResponse, JobPosting, StudentProfile, User, SkillMatch } from './types'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api/v1'
 
@@ -74,6 +74,12 @@ export const api = {
 
     delete: (id: number) =>
       request<ApiResponse<null>>(`/jobs/${id}`, { method: 'DELETE' }),
+
+    match: (id: number) =>
+      request<ApiResponse<SkillMatch>>(`/jobs/${id}/match`),
+
+    apply: (id: number) =>
+      request<ApiResponse<null>>(`/jobs/${id}/apply`, { method: 'POST' }),
   },
 
   students: {

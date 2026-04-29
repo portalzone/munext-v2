@@ -70,7 +70,7 @@ export default function JobsPage() {
         ) : (
           <div className="space-y-4">
             {jobs.map((job) => (
-              <div key={job.id} className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:border-[#1a3a5c] transition-colors">
+              <a key={job.id} href={`/jobs/${job.id}`} className="block bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:border-[#1a3a5c] transition-colors">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
                     <h2 className="text-lg font-semibold text-gray-900">{job.title}</h2>
@@ -92,7 +92,7 @@ export default function JobsPage() {
                     </span>
                   ))}
                 </div>
-              </div>
+              </a>
             ))}
           </div>
         )}

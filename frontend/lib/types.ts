@@ -52,3 +52,13 @@ export interface ApiResponse<T> {
   message: string
   status: number
 }
+
+export interface SkillMatch {
+  job_id: number
+  job_title: string
+  score: number
+  matched_skills: string[]
+  missing_skills: string[]
+  total_required: number
+  total_matched: number
+}
