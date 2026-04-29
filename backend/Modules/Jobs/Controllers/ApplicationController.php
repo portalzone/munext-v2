@@ -33,10 +33,15 @@ class ApplicationController extends Controller
             ], 409);
         }
 
+        $validated = $request->validate([
+            'cover_letter' => ['required', 'string', 'min:50', 'max:5000'],
+        ]);
+
         $application = Application::create([
-            'student_id' => $request->user()->id,
-            'job_id'     => $job->id,
-            'status'     => 'pending',
+            'student_id'   => $request->user()->id,
+            'job_id'       => $job->id,
+            'status'       => 'pending',
+            'cover_letter' => $validated['cover_letter'],
         ]);
 
         return response()->json([

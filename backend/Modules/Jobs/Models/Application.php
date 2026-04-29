@@ -11,6 +11,7 @@ class Application extends Model
         'student_id',
         'job_id',
         'status',
+        'cover_letter',
         'applied_at',
     ];
 

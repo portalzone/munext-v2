@@ -262,6 +262,12 @@ export default function EmployerDashboard() {
                 </div>
 
                 <div className="mt-4 flex gap-3 border-t border-gray-100 pt-4">
+                  <a
+                    href={`/employer/applicants/${job.id}`}
+                    className="text-sm text-gray-600 font-medium hover:underline"
+                  >
+                    View applicants
+                  </a>
                   <button
                     onClick={() => startEdit(job)}
                     className="text-sm text-[#1a3a5c] font-medium hover:underline"

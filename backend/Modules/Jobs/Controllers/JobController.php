@@ -29,13 +29,47 @@ class JobController extends Controller
         ]);
     }
 
-    // Any authenticated user can view all job postings
-    public function index(): JsonResponse
+    // Any authenticated user can view all active job postings (paginated + filtered)
+    public function index(Request $request): JsonResponse
     {
-        $jobs = JobPosting::with('employer:id,name,email')->latest()->get();
+        $query = JobPosting::with('employer:id,name,email')
+            ->where('is_active', true)
+            ->latest();
+
+        if ($search = $request->query('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'ilike', "%{$search}%")
+                  ->orWhere('description', 'ilike', "%{$search}%");
+            });
+        }
+
+        if ($category = $request->query('category')) {
+            $query->where('category', $category);
+        }
+
+        if ($level = $request->query('experience_level')) {
+            $query->where('experience_level', $level);
+        }
+
+        if ($min = $request->query('salary_min')) {
+            $query->where('salary_max', '>=', (int) $min);
+        }
+
+        if ($max = $request->query('salary_max')) {
+            $query->where('salary_min', '<=', (int) $max);
+        }
+
+        $perPage = min((int) $request->query('per_page', 15), 50);
+        $jobs    = $query->paginate($perPage);
 
         return response()->json([
-            'data'    => $jobs,
+            'data'       => $jobs->items(),
+            'pagination' => [
+                'total'        => $jobs->total(),
+                'per_page'     => $jobs->perPage(),
+                'current_page' => $jobs->currentPage(),
+                'last_page'    => $jobs->lastPage(),
+            ],
             'message' => 'Job postings retrieved successfully',
             'status'  => 200,
         ]);
@@ -70,11 +104,15 @@ class JobController extends Controller
             'skills_required'  => ['required', 'array', 'min:1'],
             'skills_required.*'=> ['string'],
             'experience_level' => ['required', 'in:entry,mid,senior'],
+            'category'         => ['nullable', 'string', 'max:100'],
+            'salary_min'       => ['nullable', 'integer', 'min:0'],
+            'salary_max'       => ['nullable', 'integer', 'min:0', 'gte:salary_min'],
         ]);
 
         $job = JobPosting::create([
             ...$validated,
             'employer_id' => $request->user()->id,
+            'is_active'   => true,
         ]);
 
         return response()->json([
@@ -101,6 +139,10 @@ class JobController extends Controller
             'skills_required'  => ['sometimes', 'array', 'min:1'],
             'skills_required.*'=> ['string'],
             'experience_level' => ['sometimes', 'in:entry,mid,senior'],
+            'category'         => ['sometimes', 'nullable', 'string', 'max:100'],
+            'salary_min'       => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'salary_max'       => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'is_active'        => ['sometimes', 'boolean'],
         ]);
 
         $job->update($validated);

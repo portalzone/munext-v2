@@ -1,7 +1,21 @@
 // All API calls to the Laravel backend go here.
 // Never call fetch() directly from a component — always go through this file.
 
-import { AuthResponse, ApiResponse, JobPosting, StudentProfile, User, SkillMatch } from './types'
+import {
+  AuthResponse,
+  ApiResponse,
+  JobPosting,
+  JobListResponse,
+  JobFilters,
+  Application,
+  StudentProfile,
+  User,
+  SkillMatch,
+  ProfileStrength,
+  SuccessPredictor,
+  FunnelStage,
+  MarketTrends,
+} from './types'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api/v1'
 
@@ -32,6 +46,14 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return json as T
 }
 
+function buildQuery(params: Record<string, string | number | undefined>): string {
+  const query = Object.entries(params)
+    .filter(([, v]) => v !== undefined && v !== '')
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+    .join('&')
+  return query ? `?${query}` : ''
+}
+
 export const api = {
   auth: {
     register: (data: { name: string; email: string; password: string; role: string }) =>
@@ -54,8 +76,8 @@ export const api = {
   },
 
   jobs: {
-    list: () =>
-      request<ApiResponse<JobPosting[]>>('/jobs'),
+    list: (filters?: JobFilters) =>
+      request<JobListResponse>(`/jobs${buildQuery({ ...filters } as Record<string, string | number | undefined>)}`),
 
     myJobs: () =>
       request<ApiResponse<JobPosting[]>>('/jobs/my-jobs'),
@@ -81,8 +103,23 @@ export const api = {
     match: (id: number) =>
       request<ApiResponse<SkillMatch>>(`/jobs/${id}/match`),
 
-    apply: (id: number) =>
-      request<ApiResponse<null>>(`/jobs/${id}/apply`, { method: 'POST' }),
+    apply: (id: number, coverLetter: string) =>
+      request<ApiResponse<Application>>(`/jobs/${id}/apply`, {
+        method: 'POST',
+        body: JSON.stringify({ cover_letter: coverLetter }),
+      }),
+
+    applicants: (jobId: number) =>
+      request<ApiResponse<Application[]>>(`/jobs/${jobId}/applicants`),
+
+    updateStatus: (jobId: number, applicationId: number, status: Application['status']) =>
+      request<ApiResponse<Application>>(`/jobs/${jobId}/applicants/${applicationId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ status }),
+      }),
+
+    myApplications: () =>
+      request<ApiResponse<Application[]>>('/jobs/my-applications'),
   },
 
   students: {
@@ -103,5 +140,22 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
+  },
+
+  ml: {
+    skillMatch: (jobId: number) =>
+      request<ApiResponse<SkillMatch>>(`/ml/match/${jobId}`),
+
+    profileStrength: () =>
+      request<ApiResponse<ProfileStrength>>('/ml/profile-strength'),
+
+    successPredictor: (jobId: number) =>
+      request<ApiResponse<SuccessPredictor>>(`/ml/predict/${jobId}`),
+
+    hiringFunnel: () =>
+      request<ApiResponse<{ jobs: FunnelStage[] }>>('/ml/funnel'),
+
+    marketTrends: (topN?: number) =>
+      request<ApiResponse<MarketTrends>>(`/ml/trends${topN ? `?top=${topN}` : ''}`),
   },
 }

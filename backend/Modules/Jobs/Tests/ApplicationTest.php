@@ -22,7 +22,9 @@ it('allows a student to apply to a job', function () {
     $employer = User::factory()->create(['role' => 'employer']);
     $job      = makeJob($employer);
 
-    $response = $this->actingAs($student)->postJson("/api/v1/jobs/{$job->id}/apply");
+    $response = $this->actingAs($student)->postJson("/api/v1/jobs/{$job->id}/apply", [
+        'cover_letter' => 'I am very interested in this position and believe my skills in PHP and Laravel make me an excellent fit for your team.',
+    ]);
 
     $response->assertStatus(201)
         ->assertJsonPath('data.status', 'pending');
