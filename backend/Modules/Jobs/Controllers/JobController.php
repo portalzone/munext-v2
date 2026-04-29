@@ -9,6 +9,26 @@ use Modules\Jobs\Models\JobPosting;
 
 class JobController extends Controller
 {
+    // Returns only the authenticated employer's job postings
+    public function myJobs(Request $request): JsonResponse
+    {
+        if ($request->user()->role !== 'employer') {
+            return response()->json([
+                'error'   => 'Forbidden',
+                'message' => 'Only employers can access this endpoint',
+                'status'  => 403,
+            ], 403);
+        }
+
+        $jobs = JobPosting::where('employer_id', $request->user()->id)->latest()->get();
+
+        return response()->json([
+            'data'    => $jobs,
+            'message' => 'Your job postings retrieved successfully',
+            'status'  => 200,
+        ]);
+    }
+
     // Any authenticated user can view all job postings
     public function index(): JsonResponse
     {

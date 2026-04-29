@@ -1,7 +1,7 @@
 // All API calls to the Laravel backend go here.
 // Never call fetch() directly from a component — always go through this file.
 
-import { AuthResponse, ApiResponse, JobPosting, StudentProfile } from './types'
+import { AuthResponse, ApiResponse, JobPosting, StudentProfile, User } from './types'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api/v1'
 
@@ -45,14 +45,35 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
+
+    me: () =>
+      request<ApiResponse<User>>('/auth/me'),
   },
 
   jobs: {
     list: () =>
       request<ApiResponse<JobPosting[]>>('/jobs'),
 
+    myJobs: () =>
+      request<ApiResponse<JobPosting[]>>('/jobs/my-jobs'),
+
     get: (id: number) =>
       request<ApiResponse<JobPosting>>(`/jobs/${id}`),
+
+    create: (data: Omit<JobPosting, 'id' | 'employer_id' | 'created_at' | 'updated_at' | 'employer'>) =>
+      request<ApiResponse<JobPosting>>('/jobs', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    update: (id: number, data: Partial<Omit<JobPosting, 'id' | 'employer_id' | 'created_at' | 'updated_at' | 'employer'>>) =>
+      request<ApiResponse<JobPosting>>(`/jobs/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+
+    delete: (id: number) =>
+      request<ApiResponse<null>>(`/jobs/${id}`, { method: 'DELETE' }),
   },
 
   students: {

@@ -60,6 +60,15 @@ class AuthController extends Controller
         ]);
     }
 
+    public function me(Request $request): JsonResponse
+    {
+        return response()->json([
+            'data'    => $request->user(),
+            'message' => 'Authenticated user retrieved',
+            'status'  => 200,
+        ]);
+    }
+
     public function logout(Request $request): JsonResponse
     {
         $request->user()->currentAccessToken()->delete();
