@@ -11,7 +11,8 @@ Employers post jobs and manage applicants through a hiring pipeline. Admins mode
 | Backend | Laravel 13, PHP 8.3, Sanctum, Spatie Activity Log |
 | Frontend | Next.js 16, TypeScript, TanStack Query, Recharts |
 | Database | PostgreSQL 16 |
-| Testing | Pest (99 tests, 246 assertions) |
+| Queue | Laravel database queue + Docker worker service |
+| Testing | Pest |
 | DevOps | Docker, Docker Compose, Nginx |
 
 ## Project Structure
@@ -40,8 +41,14 @@ munext-v2/
         profile/      ← Student profile + strength score
         employer/     ← Employer dashboard
         employer/applicants/[jobId]/ ← Applicant management
+        employer/messages/    ← Employer message inbox
+        messages/[applicationId]/ ← Per-application chat thread
         admin/        ← Admin dashboard + ML analytics
         notifications/ ← In-app notifications
+      about/          ← About Us page
+      contact/        ← Contact Us (functional form)
+      privacy/        ← Privacy Policy
+      terms/          ← Terms of Use
     lib/
       api.ts          ← All API calls
       types.ts        ← All TypeScript interfaces
@@ -87,24 +94,59 @@ DB_PASSWORD=secret
 NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
 ```
 
-**3. Start the full stack**
+**3. Configure mail (optional — for email delivery)**
+
+In `backend/.env`, set your SMTP credentials. Example for Hostinger:
+
+```env
+MAIL_MAILER=smtp
+MAIL_SCHEME=smtp
+MAIL_HOST=smtp.hostinger.com
+MAIL_PORT=587
+MAIL_USERNAME=your@email.com
+MAIL_PASSWORD=yourpassword
+MAIL_FROM_ADDRESS="your@email.com"
+MAIL_FROM_NAME="MUNext"
+```
+
+If mail is not configured, emails log to `backend/storage/logs/laravel.log`.
+
+**4. Start the full stack**
 
 ```bash
 docker compose up --build
 ```
 
-**4. Run migrations**
+This starts 5 containers: `app` (PHP-FPM), `nginx`, `postgres`, `frontend`, and `worker` (queue processor).
+
+**5. Run migrations**
 
 ```bash
 docker compose exec app php artisan migrate
 ```
 
-**5. Access the app**
+**6. (Optional) Seed an admin user**
+
+```bash
+docker compose exec app php artisan tinker
+```
+
+```php
+\App\Models\User::create([
+    'name'     => 'Admin',
+    'email'    => 'admin@example.com',
+    'password' => bcrypt('password'),
+    'role'     => 'admin',
+]);
+```
+
+**7. Access the app**
 
 | Service | URL |
 |---|---|
 | Frontend | http://localhost:3001 |
-| Laravel API | http://localhost:8000 |
+| Laravel API | http://localhost:8000/api/v1 |
+| PostgreSQL | localhost:5433 (user: `munext`, db: `munext`) |
 
 ## Running Tests
 
@@ -112,7 +154,7 @@ docker compose exec app php artisan migrate
 docker compose exec app php artisan test
 ```
 
-99 tests · 246 assertions · all passing
+All Pest tests must pass before any feature is considered done. Each endpoint has at minimum: happy path, unauthenticated access, and invalid input tests.
 
 ## API Endpoints
 
@@ -162,14 +204,27 @@ All routes prefixed `/api/v1/`. Sanctum token in `Authorization: Bearer <token>`
 | GET | /ml/trends | Admin | EWMA market trend analysis |
 
 ### Admin
-| Method | Endpoint | Access |
+| Method | Endpoint | Description |
 |---|---|---|
-| GET | /admin/stats | Admin |
-| GET | /admin/users | Admin |
-| PUT | /admin/users/{id}/toggle | Admin |
-| GET | /admin/jobs | Admin |
-| PUT | /admin/jobs/{id}/toggle | Admin |
-| DELETE | /admin/jobs/{id} | Admin |
+| GET | /admin/stats | Platform statistics |
+| GET | /admin/users | List all users (search, role filter) |
+| PUT | /admin/users/{id}/toggle | Activate / deactivate account |
+| PUT | /admin/users/{id}/promote | Promote user to admin |
+| PUT | /admin/users/{id}/ban | Ban user with reason |
+| PUT | /admin/users/{id}/unban | Remove ban |
+| PUT | /admin/users/{id}/approve-employer | Approve employer to post jobs |
+| GET | /admin/jobs | List all jobs (search, status filter) |
+| PUT | /admin/jobs/{id}/toggle | Activate / deactivate job |
+| DELETE | /admin/jobs/{id} | Delete job |
+| GET | /admin/audit-log | Paginated Spatie activity log |
+
+### Messages
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | /messages/{applicationId} | Fetch thread for an application |
+| POST | /messages/{applicationId} | Send message (supports file attachment) |
+| GET | /messages/unread-count | Total unread messages count |
+| POST | /messages/broadcast/{jobId} | Employer: message all applicants for a job |
 
 ### Notifications
 | Method | Endpoint | Access |
@@ -177,6 +232,11 @@ All routes prefixed `/api/v1/`. Sanctum token in `Authorization: Bearer <token>`
 | GET | /notifications | Authenticated |
 | PUT | /notifications/{id}/read | Authenticated |
 | PUT | /notifications/read-all | Authenticated |
+
+### Contact
+| Method | Endpoint | Access |
+|---|---|---|
+| POST | /contact | Public |
 
 ## Features
 
@@ -193,17 +253,73 @@ All routes prefixed `/api/v1/`. Sanctum token in `Authorization: Bearer <token>`
 
 ### Employer
 - Post, edit, deactivate job listings with salary range and category
+- Must be approved by an admin before posting jobs
 - View applicants per job with cover letter
-- Move applicants through hiring pipeline
+- Move applicants through hiring pipeline (pending → reviewed → shortlisted → hired/rejected)
 - Hiring funnel analytics chart (Algorithm 3)
+- Message inbox: view active conversations per job
+- Broadcast a message to all applicants on a job
 
 ### Admin
-- Platform stats (users, jobs, applications)
-- User management with deactivate/activate
-- Job moderation (toggle, delete)
+- Platform stats (total users, jobs, applications, categories)
+- User management: activate/deactivate, ban/unban with reason, promote to admin
+- Employer approval: approve or revoke posting rights
+- Job moderation: toggle active status, delete
 - ML analytics dashboard with all 5 algorithm outputs (Recharts charts)
+- Audit trail: paginated Spatie activity log for all sensitive actions
+
+### Messaging
+- Per-application chat thread between student and employer
+- File attachment support (PDF, Word, images)
+- Unread message badge in navbar and message list
+- Email notification to recipient on new message (queued)
 
 ### Platform
-- Activity log (Spatie) on login, apply, status change, job create/delete
-- Rate limiting on apply endpoint
+- Activity log (Spatie) on all sensitive actions: login, apply, status change, job create/delete, ban, promote
+- Rate limiting on apply endpoint (5 requests/minute)
 - Role-based access control on every endpoint
+- Email queue via Laravel database driver + Docker worker container
+- In-app notifications for status changes and new job matches
+- Contact Us form (public, no login required)
+- Static pages: About Us, Privacy Policy, Terms of Use
+
+## Five ML Algorithms (Pure PHP)
+
+All algorithms live in `backend/app/Services/MLService.php`. No Python, no external ML library.
+
+| # | Algorithm | Endpoint | Used by |
+|---|---|---|---|
+| 1 | Jaccard skill match score | `GET /ml/match/{jobId}` | Job detail page, applicant list |
+| 2 | Weighted profile strength score | `GET /ml/profile-strength` | Student profile page |
+| 3 | Hiring funnel analytics | `GET /ml/funnel` | Employer dashboard |
+| 4 | Application success predictor | `GET /ml/predict/{jobId}` | Job detail page |
+| 5 | EWMA market trend analysis | `GET /ml/trends` | Admin ML dashboard |
+
+## Troubleshooting
+
+**Emails not sending**
+The queue worker container (`munext_worker`) must be running. Check with:
+```bash
+docker compose ps
+```
+If stopped, restart with `docker compose up worker`. Confirm your SMTP credentials in `backend/.env`, then clear config cache:
+```bash
+docker compose exec app php artisan config:clear
+```
+
+**Migrations fail / DB connection refused**
+Wait ~10 seconds after `docker compose up` for PostgreSQL to be ready, then run:
+```bash
+docker compose exec app php artisan migrate
+```
+
+**Frontend can't reach the API**
+Ensure `NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1` is set in `frontend/.env.local` and that the `nginx` container is running on port 8000.
+
+**Employer can't post jobs**
+An admin must approve the employer account first. Log in as admin, go to the Users tab in the admin panel, and click "Approve" next to the employer.
+
+## Contact
+
+Support: support@basepan.com  
+Website: munext.basepan.com
