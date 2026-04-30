@@ -6,15 +6,31 @@ use Modules\Jobs\Controllers\ApplicationController;
 use Modules\Jobs\Controllers\BookmarkController;
 use Modules\Jobs\Controllers\SkillMatchController;
 
-Route::middleware('auth:sanctum')->prefix('v1/jobs')->group(function () {
-    // Static routes must come before /{job} to avoid Laravel treating them as a job ID
-    Route::get('/',          [JobController::class, 'index']);
-    Route::get('/my-jobs',   [JobController::class, 'myJobs']);
-    Route::get('/bookmarks', [BookmarkController::class, 'index']);
-    Route::post('/',         [JobController::class, 'store']);
+// ── Public routes (no auth required) ─────────────────────────────────────────
+// Static public routes must be declared before the dynamic /{job} catch-all.
 
-    // Dynamic routes
-    Route::get('/{job}',    [JobController::class, 'show']);
+Route::prefix('v1/jobs')->group(function () {
+    Route::get('/',      [JobController::class, 'index']);
+});
+
+// ── Auth-required static routes (must be registered before /{job}) ───────────
+
+Route::middleware('auth:sanctum')->prefix('v1/jobs')->group(function () {
+    Route::get('/my-jobs',         [JobController::class, 'myJobs']);
+    Route::get('/bookmarks',       [BookmarkController::class, 'index']);
+    Route::get('/my-applications', [ApplicationController::class, 'myApplications']);
+    Route::post('/',               [JobController::class, 'store']);
+});
+
+// ── Public single-job route ───────────────────────────────────────────────────
+
+Route::prefix('v1/jobs')->group(function () {
+    Route::get('/{job}', [JobController::class, 'show']);
+});
+
+// ── Auth-required job-specific routes ────────────────────────────────────────
+
+Route::middleware('auth:sanctum')->prefix('v1/jobs')->group(function () {
     Route::put('/{job}',    [JobController::class, 'update']);
     Route::delete('/{job}', [JobController::class, 'destroy']);
 
@@ -31,6 +47,3 @@ Route::middleware('auth:sanctum')->prefix('v1/jobs')->group(function () {
     Route::post('/{job}/bookmark', [BookmarkController::class, 'toggle']);
 });
 
-Route::middleware('auth:sanctum')->prefix('v1')->group(function () {
-    Route::get('/my-applications', [ApplicationController::class, 'myApplications']);
-});

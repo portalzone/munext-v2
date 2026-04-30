@@ -119,7 +119,7 @@ it('allows a student to view their own applications', function () {
 
     Application::create(['student_id' => $student->id, 'job_id' => $job->id, 'status' => 'pending']);
 
-    $response = $this->actingAs($student)->getJson('/api/v1/my-applications');
+    $response = $this->actingAs($student)->getJson('/api/v1/jobs/my-applications');
 
     $response->assertStatus(200)
         ->assertJsonCount(1, 'data');

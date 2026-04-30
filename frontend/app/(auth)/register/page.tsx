@@ -19,7 +19,7 @@ export default function RegisterPage() {
     name: '',
     email: '',
     password: '',
-    role: 'student' as 'student' | 'employer',
+    role: 'student' as 'student' | 'alumni' | 'employer',
   })
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -49,16 +49,13 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen flex">
       {/* Left branding panel */}
-      <div className="hidden lg:flex lg:w-1/2 bg-[#1a3a5c] flex-col justify-between p-12">
-        <div>
-          <span className="text-white text-2xl font-bold tracking-tight">MUNext</span>
-        </div>
-        <div>
+      <div className="hidden lg:flex lg:w-1/2 bg-[#1a3a5c] flex-col p-12">
+        <div className="flex-1 flex flex-col justify-center">
           <h2 className="text-white text-4xl font-semibold leading-snug">
             Connect with opportunities<br />at Memorial University.
           </h2>
           <p className="mt-4 text-blue-200 text-base leading-relaxed max-w-sm">
-            MUNext bridges MUN students and employers — find jobs, post roles, and build your career.
+            MUNext bridges MUN students, alumni, and employers — find jobs, post roles, and build your career.
           </p>
         </div>
         <p className="text-blue-300 text-sm">© {new Date().getFullYear()} MUNext. Memorial University of Newfoundland.</p>
@@ -126,8 +123,9 @@ export default function RegisterPage() {
                 onChange={handleChange}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#1a3a5c] focus:border-transparent"
               >
-                <option value="student">Student</option>
-                <option value="employer">Employer</option>
+                  <option value="student">Student (current MUN student)</option>
+                <option value="alumni">Alumni (MUN graduate)</option>
+                <option value="employer">Employer (posting jobs)</option>
               </select>
             </div>
 

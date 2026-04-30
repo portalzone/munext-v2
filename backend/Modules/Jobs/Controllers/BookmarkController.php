@@ -13,7 +13,7 @@ class BookmarkController extends Controller
     // GET /api/v1/jobs/bookmarks — student's saved jobs
     public function index(Request $request): JsonResponse
     {
-        if ($request->user()->role !== 'student') {
+        if (! $request->user()->isJobSeeker()) {
             return response()->json(['error' => 'Students only.'], 403);
         }
 
@@ -34,7 +34,7 @@ class BookmarkController extends Controller
     // POST /api/v1/jobs/{job}/bookmark — toggle bookmark on/off
     public function toggle(Request $request, JobPosting $job): JsonResponse
     {
-        if ($request->user()->role !== 'student') {
+        if (! $request->user()->isJobSeeker()) {
             return response()->json(['error' => 'Students only.'], 403);
         }
 
@@ -66,7 +66,7 @@ class BookmarkController extends Controller
     // GET /api/v1/jobs/{job}/bookmark — check if a job is bookmarked
     public function status(Request $request, JobPosting $job): JsonResponse
     {
-        if ($request->user()->role !== 'student') {
+        if (! $request->user()->isJobSeeker()) {
             return response()->json(['error' => 'Students only.'], 403);
         }
 

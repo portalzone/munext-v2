@@ -1,9 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
+import Link from 'next/link'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { StudentProfile } from '@/lib/types'
+
+const STORAGE_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api/v1')
+  .replace('/api/v1', '')
 
 const STRENGTH_COLORS: Record<string, string> = {
   Weak:      'text-red-600',
@@ -35,6 +39,9 @@ export default function ProfilePage() {
   })
   const [skillInput, setSkillInput] = useState('')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [resumeError, setResumeError] = useState<string | null>(null)
+  const [resumeSuccess, setResumeSuccess] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const { data, isLoading } = useQuery({
     queryKey: ['my-profile'],
@@ -44,6 +51,12 @@ export default function ProfilePage() {
   const { data: strengthData } = useQuery({
     queryKey: ['profile-strength'],
     queryFn: () => api.ml.profileStrength(),
+  })
+
+  const { data: recsData } = useQuery({
+    queryKey: ['job-recommendations'],
+    queryFn: () => api.ml.jobRecommendations(6),
+    enabled: !!data?.data,
   })
 
   const createMutation = useMutation({
@@ -65,6 +78,38 @@ export default function ProfilePage() {
     },
     onError: () => setErrorMessage('Failed to update profile. Please try again.'),
   })
+
+  const resumeMutation = useMutation({
+    mutationFn: (file: File) => api.students.uploadResume(file),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-profile'] })
+      queryClient.invalidateQueries({ queryKey: ['profile-strength'] })
+      setResumeSuccess(true)
+      setResumeError(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    },
+    onError: (err: { error?: string }) => {
+      setResumeError(err?.error ?? 'Upload failed. Try again.')
+      setResumeSuccess(false)
+    },
+  })
+
+  function handleResumeChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setResumeError(null)
+    setResumeSuccess(false)
+    const allowed = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+    if (!allowed.includes(file.type)) {
+      setResumeError('Only PDF, DOC, and DOCX files are allowed.')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setResumeError('File must be under 5 MB.')
+      return
+    }
+    resumeMutation.mutate(file)
+  }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value } = e.target
@@ -282,6 +327,68 @@ export default function ProfilePage() {
           </div>
         </div>
 
+        {/* Resume Card */}
+        <div className="mt-6 bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-semibold text-gray-900">Resume</h2>
+          </div>
+
+          {profile!.resume_path ? (
+            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200 mb-4">
+              <svg className="w-8 h-8 text-red-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-800 truncate">
+                  {profile!.resume_path.split('/').pop()}
+                </p>
+                <p className="text-xs text-gray-400">Uploaded resume</p>
+              </div>
+              <a
+                href={`${STORAGE_BASE}/storage/${profile!.resume_path}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-blue-600 hover:underline shrink-0"
+              >
+                Download
+              </a>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400 mb-4">No resume uploaded yet.</p>
+          )}
+
+          {resumeSuccess && (
+            <p className="text-sm text-green-600 mb-3">Resume uploaded successfully.</p>
+          )}
+          {resumeError && (
+            <p className="text-sm text-red-600 mb-3">{resumeError}</p>
+          )}
+
+          <label className="cursor-pointer">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.doc,.docx"
+              className="sr-only"
+              onChange={handleResumeChange}
+              disabled={resumeMutation.isPending}
+            />
+            <span className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors">
+              {resumeMutation.isPending ? (
+                'Uploading...'
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                  {profile!.resume_path ? 'Replace Resume' : 'Upload Resume'}
+                </>
+              )}
+            </span>
+          </label>
+          <p className="text-xs text-gray-400 mt-2">PDF, DOC or DOCX · max 5 MB</p>
+        </div>
+
         {/* Profile Strength Card */}
         {strengthData?.data && (() => {
           const s = strengthData.data
@@ -341,6 +448,54 @@ export default function ProfilePage() {
             </div>
           )
         })()}
+
+        {/* Job Recommendations */}
+        {recsData?.data && recsData.data.length > 0 && (
+          <div className="mt-6 bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">Recommended for You</h2>
+                <p className="text-xs text-gray-400 mt-0.5">Based on your skills — sorted by match score</p>
+              </div>
+              <Link href="/jobs" className="text-xs text-blue-600 hover:underline">
+                Browse all →
+              </Link>
+            </div>
+            <div className="space-y-3">
+              {recsData.data.map(rec => (
+                <Link
+                  key={rec.job.id}
+                  href={`/jobs/${rec.job.id}`}
+                  className="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:border-blue-200 hover:bg-blue-50 transition-colors group"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 group-hover:text-blue-700 truncate">
+                      {rec.job.title}
+                    </p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      {rec.job.category && (
+                        <span className="text-xs text-gray-400">{rec.job.category}</span>
+                      )}
+                      {rec.job.experience_level && (
+                        <span className="text-xs text-gray-400 capitalize">· {rec.job.experience_level}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 ml-3">
+                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                      rec.score >= 75 ? 'bg-green-100 text-green-700' :
+                      rec.score >= 50 ? 'bg-blue-100 text-blue-700' :
+                      'bg-yellow-100 text-yellow-700'
+                    }`}>
+                      {rec.score}% match
+                    </span>
+                    <span className="text-gray-300 text-sm">→</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </main>
   )

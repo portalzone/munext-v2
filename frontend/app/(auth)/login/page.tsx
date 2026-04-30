@@ -43,11 +43,8 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex">
       {/* Left branding panel */}
-      <div className="hidden lg:flex lg:w-1/2 bg-[#1a3a5c] flex-col justify-between p-12">
-        <div>
-          <span className="text-white text-2xl font-bold tracking-tight">MUNext</span>
-        </div>
-        <div>
+      <div className="hidden lg:flex lg:w-1/2 bg-[#1a3a5c] flex-col p-12">
+        <div className="flex-1 flex flex-col justify-center">
           <h2 className="text-white text-4xl font-semibold leading-snug">
             Your next opportunity<br />starts here.
           </h2>
@@ -87,7 +84,12 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-gray-700">Password</label>
+                <a href="/forgot-password" className="text-xs text-[#1a3a5c] hover:underline">
+                  Forgot password?
+                </a>
+              </div>
               <input
                 type="password"
                 name="password"

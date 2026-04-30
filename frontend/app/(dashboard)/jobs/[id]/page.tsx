@@ -22,7 +22,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const [showApplyForm, setShowApplyForm] = useState(false)
   const [coverLetter, setCoverLetter]     = useState('')
   const [applyError, setApplyError]       = useState<string | null>(null)
-  const [applied, setApplied]             = useState(false)
+  const [justApplied, setJustApplied]     = useState(false)
   const queryClient = useQueryClient()
 
   const { data: jobData, isLoading: jobLoading } = useQuery({
@@ -46,12 +46,21 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
     retry: false,
   })
 
-  const isStudent = meData?.data.role === 'student'
+  const isJobSeeker = meData?.data.role === 'student' || meData?.data.role === 'alumni'
+
+  const { data: myAppsData } = useQuery({
+    queryKey: ['my-applications'],
+    queryFn: () => api.jobs.myApplications(),
+    enabled: isJobSeeker,
+  })
+
+  const alreadyApplied = myAppsData?.data?.some(a => a.job_id === jobId) ?? false
+  const applied = alreadyApplied || justApplied
 
   const { data: bookmarkData } = useQuery({
     queryKey: ['bookmark', jobId],
     queryFn: () => api.jobs.bookmarkStatus(jobId),
-    enabled: isStudent,
+    enabled: isJobSeeker,
   })
 
   const bookmarkMutation = useMutation({
@@ -67,8 +76,9 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const applyMutation = useMutation({
     mutationFn: () => api.jobs.apply(jobId, coverLetter),
     onSuccess: () => {
-      setApplied(true)
+      setJustApplied(true)
       setShowApplyForm(false)
+      queryClient.invalidateQueries({ queryKey: ['my-applications'] })
     },
     onError: (error: ApiError) => {
       setApplyError(error.message ?? 'Application failed. Please try again.')
@@ -135,7 +145,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
-              {isStudent && (
+              {isJobSeeker && (
                 <button
                   onClick={() => bookmarkMutation.mutate()}
                   disabled={bookmarkMutation.isPending}

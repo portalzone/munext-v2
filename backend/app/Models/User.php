@@ -15,7 +15,7 @@ use Laravel\Sanctum\HasApiTokens;
 use Modules\Jobs\Models\Application;
 use Modules\Students\Models\StudentProfile;
 
-#[Fillable(['name', 'email', 'password', 'role', 'is_active'])]
+#[Fillable(['name', 'email', 'password', 'role', 'is_active', 'banned_at', 'ban_reason', 'employer_approved'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -30,10 +30,22 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
-            'password'          => 'hashed',
-            'is_active'         => 'boolean',
+            'email_verified_at'  => 'datetime',
+            'password'           => 'hashed',
+            'is_active'          => 'boolean',
+            'banned_at'          => 'datetime',
+            'employer_approved'  => 'boolean',
         ];
+    }
+
+    public function isJobSeeker(): bool
+    {
+        return in_array($this->role, ['student', 'alumni']);
+    }
+
+    public function isBanned(): bool
+    {
+        return $this->banned_at !== null;
     }
 
     public function studentProfile(): HasOne

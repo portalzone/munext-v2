@@ -5,6 +5,7 @@ namespace Modules\Students\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Modules\Students\Models\StudentProfile;
 
 class StudentProfileController extends Controller
@@ -50,10 +51,10 @@ class StudentProfileController extends Controller
     // Only students can create a profile, and only one per student
     public function store(Request $request): JsonResponse
     {
-        if ($request->user()->role !== 'student') {
+        if (! $request->user()->isJobSeeker()) {
             return response()->json([
                 'error'   => 'Forbidden',
-                'message' => 'Only students can create a profile',
+                'message' => 'Only students and alumni can create a profile',
                 'status'  => 403,
             ], 403);
         }
@@ -84,6 +85,38 @@ class StudentProfileController extends Controller
             'message' => 'Student profile created successfully',
             'status'  => 201,
         ], 201);
+    }
+
+    // Student uploads or replaces their resume (pdf/doc/docx, max 5 MB)
+    public function uploadResume(Request $request): JsonResponse
+    {
+        if (! $request->user()->isJobSeeker()) {
+            return response()->json(['error' => 'Forbidden', 'message' => 'Only students and alumni can upload a resume', 'status' => 403], 403);
+        }
+
+        $profile = StudentProfile::where('user_id', $request->user()->id)->first();
+
+        if (! $profile) {
+            return response()->json(['error' => 'Not found', 'message' => 'Create a profile before uploading a resume', 'status' => 404], 404);
+        }
+
+        $request->validate([
+            'resume' => ['required', 'file', 'mimes:pdf,doc,docx', 'max:5120'],
+        ]);
+
+        if ($profile->resume_path) {
+            Storage::disk('public')->delete($profile->resume_path);
+        }
+
+        $path = $request->file('resume')->store('resumes', 'public');
+
+        $profile->update(['resume_path' => $path]);
+
+        return response()->json([
+            'data'    => ['resume_path' => $path, 'resume_url' => Storage::disk('public')->url($path)],
+            'message' => 'Resume uploaded successfully',
+            'status'  => 200,
+        ]);
     }
 
     // Only the student who owns the profile can update it

@@ -12,10 +12,10 @@ class SkillMatchController extends Controller
 {
     public function match(Request $request, JobPosting $job): JsonResponse
     {
-        if ($request->user()->role !== 'student') {
+        if (! $request->user()->isJobSeeker()) {
             return response()->json([
                 'error'   => 'Forbidden',
-                'message' => 'Only students can check skill match',
+                'message' => 'Only students and alumni can check skill match',
                 'status'  => 403,
             ], 403);
         }

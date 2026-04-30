@@ -41,6 +41,22 @@ services:
     networks:
       - munext
 
+  # Laravel queue worker — processes queued jobs (emails, notifications)
+  worker:
+    build:
+      context: ./backend
+      dockerfile: ../docker/app/Dockerfile
+    container_name: munext_worker
+    working_dir: /var/www
+    command: php artisan queue:work --sleep=3 --tries=3 --timeout=90
+    volumes:
+      - ./backend:/var/www
+    depends_on:
+      - postgres
+    networks:
+      - munext
+    restart: unless-stopped
+
   # PostgreSQL database
   postgres:
     image: postgres:16-alpine

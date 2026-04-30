@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
-import { JobFilters, JobPosting } from '@/lib/types'
+import { JobFilters, JobPosting, JobType } from '@/lib/types'
 
 const LEVEL_LABELS: Record<JobPosting['experience_level'], string> = {
   entry: 'Entry Level',
@@ -15,6 +15,13 @@ const LEVEL_COLORS: Record<JobPosting['experience_level'], string> = {
   entry:  'bg-green-100 text-green-700',
   mid:    'bg-blue-100 text-blue-700',
   senior: 'bg-purple-100 text-purple-700',
+}
+
+const JOB_TYPE_LABELS: Record<JobType, string> = {
+  'full-time':  'Full-time',
+  'part-time':  'Part-time',
+  'contract':   'Contract',
+  'internship': 'Internship',
 }
 
 const CATEGORIES = [
@@ -42,8 +49,10 @@ function formatSalary(min: number | null, max: number | null): string | null {
 }
 
 export default function JobsPage() {
-  const [filters, setFilters] = useState<JobFilters>({ page: 1, per_page: 15 })
-  const [search, setSearch] = useState('')
+  const [filters, setFilters]     = useState<JobFilters>({ page: 1, per_page: 15 })
+  const [search, setSearch]       = useState('')
+  const [location, setLocation]   = useState('')
+  const [pendingFilters, setPendingFilters] = useState<Omit<JobFilters, 'search' | 'location' | 'page' | 'per_page'>>({})
   const queryClient = useQueryClient()
 
   const { data, isLoading, isError } = useQuery({
@@ -72,141 +81,166 @@ export default function JobsPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['bookmarks'] }),
   })
 
-  function applySearch(e: React.FormEvent) {
+  function applyFilters(e: React.FormEvent) {
     e.preventDefault()
-    setFilters(f => ({ ...f, search: search || undefined, page: 1 }))
-  }
-
-  function setFilter(key: keyof JobFilters, value: string | number | undefined) {
-    setFilters(f => ({ ...f, [key]: value || undefined, page: 1 }))
+    setFilters({
+      ...pendingFilters,
+      search:   search || undefined,
+      location: location || undefined,
+      page: 1,
+      per_page: 15,
+    })
   }
 
   function clearFilters() {
     setSearch('')
+    setLocation('')
+    setPendingFilters({})
     setFilters({ page: 1, per_page: 15 })
   }
 
-  const jobs        = data?.data ?? []
-  const pagination  = data?.pagination
-  const hasFilters  = !!(filters.search || filters.category || filters.experience_level || filters.salary_min || filters.salary_max)
+  function setPending(key: keyof typeof pendingFilters, value: string | boolean | undefined) {
+    setPendingFilters(f => ({ ...f, [key]: value || undefined }))
+  }
+
+  const jobs       = data?.data ?? []
+  const pagination = data?.pagination
+  const hasFilters = !!(
+    filters.search || filters.category || filters.job_type ||
+    filters.experience_level || filters.location || filters.is_remote ||
+    filters.salary_min || filters.salary_max
+  )
 
   return (
     <main className="min-h-screen bg-gray-50">
       <div className="max-w-5xl mx-auto px-6 py-8">
 
-        {/* Header + search */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Job Postings</h1>
-          <form onSubmit={applySearch} className="flex gap-2">
-            <input
-              type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search jobs by title or keyword..."
-              className="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1a3a5c] focus:border-transparent"
-            />
-            <button
-              type="submit"
-              className="bg-[#1a3a5c] text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#15304d] transition-colors"
-            >
-              Search
-            </button>
-          </form>
+        <div className="mb-6 flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-gray-900">Job Postings</h1>
+          <select
+            value={filters.sort ?? 'newest'}
+            onChange={e => setFilters(f => ({ ...f, sort: e.target.value as JobFilters['sort'], page: 1 }))}
+            className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-[#1a3a5c]"
+          >
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="salary_high">Salary: high to low</option>
+            <option value="salary_low">Salary: low to high</option>
+          </select>
         </div>
 
         <div className="flex gap-6">
+
           {/* Filter sidebar */}
-          <aside className="hidden md:block w-52 shrink-0">
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 sticky top-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-semibold text-gray-700">Filters</h2>
+          <aside className="hidden md:block w-60 shrink-0">
+            <form
+              onSubmit={applyFilters}
+              className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 sticky top-6 space-y-5"
+            >
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-gray-800">Filters</h2>
                 {hasFilters && (
-                  <button onClick={clearFilters} className="text-xs text-[#1a3a5c] hover:underline">
+                  <button type="button" onClick={clearFilters} className="text-xs text-[#1a3a5c] hover:underline">
                     Clear all
                   </button>
                 )}
               </div>
 
+              {/* Search */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Search</label>
+                <input
+                  type="text"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Job title or keyword..."
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1a3a5c]"
+                />
+              </div>
+
               {/* Category */}
-              <div className="mb-4">
+              <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1.5">Category</label>
                 <select
-                  value={filters.category ?? ''}
-                  onChange={e => setFilter('category', e.target.value)}
+                  value={pendingFilters.category ?? ''}
+                  onChange={e => setPending('category', e.target.value)}
                   className="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1a3a5c]"
                 >
-                  <option value="">All categories</option>
+                  <option value="">All Categories</option>
                   {CATEGORIES.map(c => (
                     <option key={c} value={c}>{c}</option>
                   ))}
                 </select>
               </div>
 
-              {/* Experience level */}
-              <div className="mb-4">
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">Experience</label>
+              {/* Job Type */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Job Type</label>
                 <select
-                  value={filters.experience_level ?? ''}
-                  onChange={e => setFilter('experience_level', e.target.value)}
+                  value={pendingFilters.job_type ?? ''}
+                  onChange={e => setPending('job_type', e.target.value)}
                   className="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1a3a5c]"
                 >
-                  <option value="">All levels</option>
+                  <option value="">All Types</option>
+                  <option value="full-time">Full-time</option>
+                  <option value="part-time">Part-time</option>
+                  <option value="contract">Contract</option>
+                  <option value="internship">Internship</option>
+                </select>
+              </div>
+
+              {/* Experience Level */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Experience Level</label>
+                <select
+                  value={pendingFilters.experience_level ?? ''}
+                  onChange={e => setPending('experience_level', e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1a3a5c]"
+                >
+                  <option value="">All Levels</option>
                   <option value="entry">Entry Level</option>
                   <option value="mid">Mid Level</option>
                   <option value="senior">Senior Level</option>
                 </select>
               </div>
 
-              {/* Salary min */}
-              <div className="mb-4">
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">Min salary ($)</label>
+              {/* Location */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Location</label>
                 <input
-                  type="number"
-                  min={0}
-                  step={5000}
-                  value={filters.salary_min ?? ''}
-                  onChange={e => setFilter('salary_min', e.target.value ? Number(e.target.value) : undefined)}
-                  placeholder="e.g. 40000"
-                  className="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1a3a5c]"
+                  type="text"
+                  value={location}
+                  onChange={e => setLocation(e.target.value)}
+                  placeholder="City or province..."
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1a3a5c]"
                 />
+                <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={pendingFilters.is_remote === true}
+                    onChange={e => setPending('is_remote', e.target.checked ? true : undefined)}
+                    className="w-3.5 h-3.5 accent-[#1a3a5c]"
+                  />
+                  <span className="text-xs text-gray-600">Remote only</span>
+                </label>
               </div>
 
-              {/* Salary max */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">Max salary ($)</label>
-                <input
-                  type="number"
-                  min={0}
-                  step={5000}
-                  value={filters.salary_max ?? ''}
-                  onChange={e => setFilter('salary_max', e.target.value ? Number(e.target.value) : undefined)}
-                  placeholder="e.g. 100000"
-                  className="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1a3a5c]"
-                />
-              </div>
-            </div>
+              <button
+                type="submit"
+                className="w-full bg-[#1a3a5c] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#15304d] transition-colors"
+              >
+                Apply Filters
+              </button>
+            </form>
           </aside>
 
           {/* Job list */}
           <div className="flex-1 min-w-0">
-            {/* Result count + sort */}
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-sm text-gray-500">
-                {isLoading ? 'Loading...' : pagination
-                  ? `${pagination.total} ${pagination.total === 1 ? 'job' : 'jobs'} found`
-                  : ''}
-              </p>
-              <select
-                value={filters.sort ?? 'newest'}
-                onChange={e => setFilter('sort', e.target.value as JobFilters['sort'])}
-                className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-[#1a3a5c]"
-              >
-                <option value="newest">Newest first</option>
-                <option value="oldest">Oldest first</option>
-                <option value="salary_high">Salary: high to low</option>
-                <option value="salary_low">Salary: low to high</option>
-              </select>
-            </div>
+            <p className="text-sm text-gray-500 mb-4">
+              {isLoading ? 'Loading...' : pagination
+                ? `${pagination.total} ${pagination.total === 1 ? 'job' : 'jobs'} found`
+                : ''}
+            </p>
 
             {/* Loading skeletons */}
             {isLoading && (
@@ -222,7 +256,6 @@ export default function JobsPage() {
               </div>
             )}
 
-            {/* Error */}
             {isError && (
               <div className="bg-white rounded-xl p-12 text-center shadow-sm">
                 <p className="text-red-600 font-medium">Failed to load jobs.</p>
@@ -230,7 +263,6 @@ export default function JobsPage() {
               </div>
             )}
 
-            {/* Empty state */}
             {!isLoading && !isError && jobs.length === 0 && (
               <div className="bg-white rounded-xl p-12 text-center shadow-sm">
                 <p className="text-gray-500 font-medium">No jobs match your filters.</p>
@@ -242,13 +274,12 @@ export default function JobsPage() {
               </div>
             )}
 
-            {/* Job cards */}
             {!isLoading && !isError && jobs.length > 0 && (
               <div className="space-y-4">
                 {jobs.map((job) => {
-                  const salary     = formatSalary(job.salary_min, job.salary_max)
-                  const saved      = bookmarkedIds.has(job.id)
-                  const isPending  = bookmarkMutation.isPending && bookmarkMutation.variables === job.id
+                  const salary    = formatSalary(job.salary_min, job.salary_max)
+                  const saved     = bookmarkedIds.has(job.id)
+                  const isPending = bookmarkMutation.isPending && bookmarkMutation.variables === job.id
                   return (
                     <a
                       key={job.id}
@@ -256,12 +287,22 @@ export default function JobsPage() {
                       className="block bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:border-[#1a3a5c] transition-colors"
                     >
                       <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-0">
                           <h2 className="text-lg font-semibold text-gray-900">{job.title}</h2>
                           <div className="flex flex-wrap items-center gap-2 mt-0.5">
-                            <span className="text-sm text-gray-500">
-                              {job.employer?.name ?? 'Unknown'}
-                            </span>
+                            <span className="text-sm text-gray-500">{job.employer?.name ?? 'Unknown'}</span>
+                            {job.location && (
+                              <>
+                                <span className="text-gray-300">·</span>
+                                <span className="text-sm text-gray-500">{job.location}</span>
+                              </>
+                            )}
+                            {job.is_remote && (
+                              <>
+                                <span className="text-gray-300">·</span>
+                                <span className="text-xs font-medium text-teal-600 bg-teal-50 px-2 py-0.5 rounded-full">Remote</span>
+                              </>
+                            )}
                             {job.category && (
                               <>
                                 <span className="text-gray-300">·</span>
@@ -276,6 +317,7 @@ export default function JobsPage() {
                             )}
                           </div>
                         </div>
+
                         <div className="flex items-center gap-2 shrink-0">
                           {isStudent && (
                             <button
@@ -299,9 +341,16 @@ export default function JobsPage() {
                               )}
                             </button>
                           )}
-                          <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${LEVEL_COLORS[job.experience_level]}`}>
-                            {LEVEL_LABELS[job.experience_level]}
-                          </span>
+                          <div className="flex flex-col items-end gap-1">
+                            <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${LEVEL_COLORS[job.experience_level]}`}>
+                              {LEVEL_LABELS[job.experience_level]}
+                            </span>
+                            {job.job_type && (
+                              <span className="text-xs text-gray-500">
+                                {JOB_TYPE_LABELS[job.job_type]}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
 

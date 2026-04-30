@@ -67,6 +67,18 @@ class JobController extends Controller
             $query->where('experience_level', $level);
         }
 
+        if ($jobType = $request->query('job_type')) {
+            $query->where('job_type', $jobType);
+        }
+
+        if ($location = $request->query('location')) {
+            $query->where('location', 'ilike', "%{$location}%");
+        }
+
+        if ($request->query('is_remote') === 'true') {
+            $query->where('is_remote', true);
+        }
+
         if ($min = $request->query('salary_min')) {
             $query->where('salary_max', '>=', (int) $min);
         }
@@ -114,10 +126,20 @@ class JobController extends Controller
     // Only employers can create job postings
     public function store(Request $request): JsonResponse
     {
-        if ($request->user()->role !== 'employer') {
+        $employer = $request->user();
+
+        if ($employer->role !== 'employer') {
             return response()->json([
                 'error'   => 'Forbidden',
                 'message' => 'Only employers can post jobs',
+                'status'  => 403,
+            ], 403);
+        }
+
+        if (! $employer->employer_approved) {
+            return response()->json([
+                'error'   => 'Account pending approval.',
+                'message' => 'Your employer account is awaiting admin approval before you can post jobs.',
                 'status'  => 403,
             ], 403);
         }
@@ -129,6 +151,9 @@ class JobController extends Controller
             'skills_required.*'=> ['string'],
             'experience_level' => ['required', 'in:entry,mid,senior'],
             'category'         => ['nullable', 'string', 'max:100'],
+            'job_type'         => ['nullable', 'in:full-time,part-time,contract,internship'],
+            'location'         => ['nullable', 'string', 'max:100'],
+            'is_remote'        => ['nullable', 'boolean'],
             'salary_min'       => ['nullable', 'integer', 'min:0'],
             'salary_max'       => ['nullable', 'integer', 'min:0', 'gte:salary_min'],
         ]);
@@ -167,6 +192,9 @@ class JobController extends Controller
             'skills_required.*'=> ['string'],
             'experience_level' => ['sometimes', 'in:entry,mid,senior'],
             'category'         => ['sometimes', 'nullable', 'string', 'max:100'],
+            'job_type'         => ['sometimes', 'nullable', 'in:full-time,part-time,contract,internship'],
+            'location'         => ['sometimes', 'nullable', 'string', 'max:100'],
+            'is_remote'        => ['sometimes', 'boolean'],
             'salary_min'       => ['sometimes', 'nullable', 'integer', 'min:0'],
             'salary_max'       => ['sometimes', 'nullable', 'integer', 'min:0'],
             'is_active'        => ['sometimes', 'boolean'],

@@ -28,10 +28,14 @@ it('allows any authenticated user to view all job postings', function () {
         ->assertJsonStructure(['data', 'message', 'status']);
 });
 
-it('rejects unauthenticated request to view job postings', function () {
+it('allows unauthenticated users to view job postings', function () {
+    $employer = User::factory()->create(['role' => 'employer']);
+    createJob($employer);
+
     $response = $this->getJson('/api/v1/jobs');
 
-    $response->assertStatus(401);
+    $response->assertStatus(200)
+        ->assertJsonStructure(['data', 'pagination']);
 });
 
 // --- Show ---

@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Modules\Jobs\Models\JobPosting;
+use Spatie\Activitylog\Models\Activity;
 
 class AdminController extends Controller
 {
@@ -154,5 +155,113 @@ class AdminController extends Controller
         $job->delete();
 
         return response()->json(['data' => null, 'message' => 'Job deleted', 'status' => 200]);
+    }
+
+    // PUT /api/v1/admin/users/{id}/promote  — make user an admin
+    public function promoteToAdmin(Request $request, int $id): JsonResponse
+    {
+        if ($guard = $this->guardAdmin($request)) return $guard;
+
+        $user = User::find($id);
+        if (! $user) return response()->json(['error' => 'User not found.'], 404);
+        if ($user->role === 'admin') {
+            return response()->json(['error' => 'User is already an admin.'], 422);
+        }
+
+        $user->update(['role' => 'admin']);
+        activity()->causedBy($request->user())->performedOn($user)
+            ->log("Promoted user to admin");
+
+        return response()->json(['data' => $user->fresh(), 'message' => 'User promoted to admin', 'status' => 200]);
+    }
+
+    // PUT /api/v1/admin/users/{id}/ban
+    public function banUser(Request $request, int $id): JsonResponse
+    {
+        if ($guard = $this->guardAdmin($request)) return $guard;
+
+        $user = User::find($id);
+        if (! $user) return response()->json(['error' => 'User not found.'], 404);
+        if ($user->id === $request->user()->id) {
+            return response()->json(['error' => 'You cannot ban yourself.'], 422);
+        }
+
+        $validated = $request->validate([
+            'reason' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $user->update([
+            'banned_at'  => now(),
+            'ban_reason' => $validated['reason'] ?? null,
+        ]);
+        $user->tokens()->delete();
+
+        activity()->causedBy($request->user())->performedOn($user)
+            ->withProperties(['reason' => $validated['reason'] ?? null])
+            ->log("Banned user");
+
+        return response()->json(['data' => $user->fresh(), 'message' => 'User banned', 'status' => 200]);
+    }
+
+    // PUT /api/v1/admin/users/{id}/unban
+    public function unbanUser(Request $request, int $id): JsonResponse
+    {
+        if ($guard = $this->guardAdmin($request)) return $guard;
+
+        $user = User::find($id);
+        if (! $user) return response()->json(['error' => 'User not found.'], 404);
+
+        $user->update(['banned_at' => null, 'ban_reason' => null]);
+
+        activity()->causedBy($request->user())->performedOn($user)
+            ->log("Unbanned user");
+
+        return response()->json(['data' => $user->fresh(), 'message' => 'User unbanned', 'status' => 200]);
+    }
+
+    // PUT /api/v1/admin/users/{id}/approve-employer
+    public function approveEmployer(Request $request, int $id): JsonResponse
+    {
+        if ($guard = $this->guardAdmin($request)) return $guard;
+
+        $user = User::find($id);
+        if (! $user) return response()->json(['error' => 'User not found.'], 404);
+        if ($user->role !== 'employer') {
+            return response()->json(['error' => 'User is not an employer.'], 422);
+        }
+
+        $user->update(['employer_approved' => ! $user->employer_approved]);
+
+        activity()->causedBy($request->user())->performedOn($user)
+            ->log($user->employer_approved ? 'Approved employer' : 'Revoked employer approval');
+
+        return response()->json([
+            'data'    => $user->fresh(),
+            'message' => $user->employer_approved ? 'Employer approved' : 'Employer approval revoked',
+            'status'  => 200,
+        ]);
+    }
+
+    // GET /api/v1/admin/audit-log
+    public function auditLog(Request $request): JsonResponse
+    {
+        if ($guard = $this->guardAdmin($request)) return $guard;
+
+        $perPage    = min((int) $request->query('per_page', 20), 100);
+        $activities = Activity::with('causer:id,name,email', 'subject')
+            ->latest()
+            ->paginate($perPage);
+
+        return response()->json([
+            'data'       => $activities->items(),
+            'pagination' => [
+                'total'        => $activities->total(),
+                'per_page'     => $activities->perPage(),
+                'current_page' => $activities->currentPage(),
+                'last_page'    => $activities->lastPage(),
+            ],
+            'message' => 'Audit log retrieved',
+            'status'  => 200,
+        ]);
     }
 }

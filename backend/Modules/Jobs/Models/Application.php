@@ -28,4 +28,9 @@ class Application extends Model
     {
         return $this->belongsTo(JobPosting::class, 'job_id');
     }
+
+    public function messages()
+    {
+        return $this->hasMany(\Modules\Messages\Models\Message::class, 'application_id');
+    }
 }

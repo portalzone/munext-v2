@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { api } from '@/lib/api'
 import { JobPosting } from '@/lib/types'
 
@@ -30,6 +31,9 @@ const EMPTY_FORM: JobForm = {
   skills_required: [],
   experience_level: 'entry',
   category: null,
+  job_type: null,
+  location: null,
+  is_remote: false,
   salary_min: null,
   salary_max: null,
   is_active: true,
@@ -60,6 +64,11 @@ export default function EmployerDashboard() {
   const { data, isLoading } = useQuery({
     queryKey: ['my-jobs', sort, page],
     queryFn: () => api.jobs.myJobs({ sort, page, per_page: 10 }),
+  })
+
+  const { data: funnelData } = useQuery({
+    queryKey: ['hiring-funnel'],
+    queryFn: () => api.ml.hiringFunnel(),
   })
 
   const createMutation = useMutation({
@@ -106,6 +115,9 @@ export default function EmployerDashboard() {
       skills_required:  job.skills_required,
       experience_level: job.experience_level,
       category:         job.category,
+      job_type:         job.job_type,
+      location:         job.location,
+      is_remote:        job.is_remote,
       salary_min:       job.salary_min,
       salary_max:       job.salary_max,
       is_active:        job.is_active,
@@ -237,6 +249,45 @@ export default function EmployerDashboard() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Job Type</label>
+                  <select
+                    name="job_type"
+                    value={form.job_type ?? ''}
+                    onChange={(e) => setForm(prev => ({ ...prev, job_type: (e.target.value as JobForm['job_type']) || null }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a3a5c]"
+                  >
+                    <option value="">Not specified</option>
+                    <option value="full-time">Full-time</option>
+                    <option value="part-time">Part-time</option>
+                    <option value="contract">Contract</option>
+                    <option value="internship">Internship</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                  <input
+                    type="text"
+                    name="location"
+                    value={form.location ?? ''}
+                    onChange={(e) => setForm(prev => ({ ...prev, location: e.target.value || null }))}
+                    placeholder="e.g. St. John's, NL"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a3a5c]"
+                  />
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.is_remote ?? false}
+                  onChange={(e) => setForm(prev => ({ ...prev, is_remote: e.target.checked }))}
+                  className="w-4 h-4 accent-[#1a3a5c]"
+                />
+                <span className="text-sm text-gray-700">Remote position</span>
+              </label>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Min Salary ($)</label>
                   <input
                     type="number"
@@ -334,6 +385,24 @@ export default function EmployerDashboard() {
                     <h2 className="text-lg font-semibold text-gray-900">{job.title}</h2>
                     <div className="flex flex-wrap items-center gap-2 mt-0.5 text-sm text-gray-500">
                       <span>Posted {new Date(job.created_at).toLocaleDateString()}</span>
+                      {job.job_type && (
+                        <>
+                          <span className="text-gray-300">·</span>
+                          <span className="capitalize">{job.job_type}</span>
+                        </>
+                      )}
+                      {job.location && (
+                        <>
+                          <span className="text-gray-300">·</span>
+                          <span>{job.location}</span>
+                        </>
+                      )}
+                      {job.is_remote && (
+                        <>
+                          <span className="text-gray-300">·</span>
+                          <span className="text-teal-600 font-medium">Remote</span>
+                        </>
+                      )}
                       {job.category && (
                         <>
                           <span className="text-gray-300">·</span>
@@ -428,6 +497,65 @@ export default function EmployerDashboard() {
             </button>
           </div>
         )}
+        {/* Hiring Funnel — Algorithm 3 */}
+        {funnelData?.data?.jobs && funnelData.data.jobs.length > 0 && (() => {
+          const chartData = funnelData.data.jobs.map(f => ({
+            name: f.job_title.length > 20 ? f.job_title.slice(0, 20) + '…' : f.job_title,
+            Applied:     f.stages.applied,
+            Reviewed:    f.stages.reviewed,
+            Shortlisted: f.stages.shortlisted,
+            Hired:       f.stages.hired,
+          }))
+          return (
+            <div className="mt-10 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <h2 className="text-base font-semibold text-gray-900 mb-1">Hiring Funnel</h2>
+              <p className="text-xs text-gray-400 mb-5">Applicant progression across pipeline stages for each job.</p>
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={chartData} margin={{ top: 0, right: 0, left: -10, bottom: 40 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fontSize: 11, fill: '#6b7280' }}
+                    angle={-30}
+                    textAnchor="end"
+                    interval={0}
+                  />
+                  <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} allowDecimals={false} />
+                  <Tooltip />
+                  <Legend wrapperStyle={{ fontSize: 12, paddingTop: 20 }} />
+                  <Bar dataKey="Applied"     fill="#93c5fd" radius={[3,3,0,0]} />
+                  <Bar dataKey="Reviewed"    fill="#60a5fa" radius={[3,3,0,0]} />
+                  <Bar dataKey="Shortlisted" fill="#3b82f6" radius={[3,3,0,0]} />
+                  <Bar dataKey="Hired"       fill="#1d4ed8" radius={[3,3,0,0]} />
+                </BarChart>
+              </ResponsiveContainer>
+
+              {/* Conversion rates table */}
+              <div className="mt-6 overflow-x-auto">
+                <table className="w-full text-xs text-gray-600">
+                  <thead>
+                    <tr className="text-left border-b border-gray-100">
+                      <th className="pb-2 font-medium text-gray-500">Job</th>
+                      <th className="pb-2 font-medium text-gray-500 text-right">→ Reviewed</th>
+                      <th className="pb-2 font-medium text-gray-500 text-right">→ Shortlisted</th>
+                      <th className="pb-2 font-medium text-gray-500 text-right">→ Hired</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {funnelData.data.jobs.map(f => (
+                      <tr key={f.job_id} className="border-b border-gray-50">
+                        <td className="py-2 pr-4 max-w-40 truncate">{f.job_title}</td>
+                        <td className="py-2 text-right">{f.conversion_rates.to_reviewed.toFixed(1)}%</td>
+                        <td className="py-2 text-right">{f.conversion_rates.to_shortlisted.toFixed(1)}%</td>
+                        <td className="py-2 text-right">{f.conversion_rates.to_hired.toFixed(1)}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )
+        })()}
       </div>
     </main>
   )

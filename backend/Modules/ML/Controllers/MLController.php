@@ -3,6 +3,7 @@
 namespace Modules\ML\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Services\MLService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,7 +17,7 @@ class MLController extends Controller
     public function skillMatch(Request $request, int $jobId): JsonResponse
     {
         $user = $request->user();
-        if ($user->role !== 'student') {
+        if (! $user->isJobSeeker()) {
             return response()->json(['error' => 'Students only.'], 403);
         }
 
@@ -35,7 +36,7 @@ class MLController extends Controller
     public function profileStrength(Request $request): JsonResponse
     {
         $user = $request->user();
-        if ($user->role !== 'student') {
+        if (! $user->isJobSeeker()) {
             return response()->json(['error' => 'Students only.'], 403);
         }
 
@@ -48,11 +49,53 @@ class MLController extends Controller
     public function successPredictor(Request $request, int $jobId): JsonResponse
     {
         $user = $request->user();
-        if ($user->role !== 'student') {
+        if (! $user->isJobSeeker()) {
             return response()->json(['error' => 'Students only.'], 403);
         }
 
         $result = $this->ml->successPredictor($user, $jobId);
+
+        return response()->json(['data' => $result]);
+    }
+
+    // GET /api/v1/ml/recommendations  — student only
+    public function jobRecommendations(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (! $user->isJobSeeker()) {
+            return response()->json(['error' => 'Students only.'], 403);
+        }
+
+        $topN   = (int) $request->query('top', 6);
+        $result = $this->ml->jobRecommendations($user, $topN);
+
+        return response()->json([
+            'data'    => $result,
+            'message' => 'Job recommendations retrieved',
+            'status'  => 200,
+        ]);
+    }
+
+    // GET /api/v1/ml/match/{jobId}/applicant/{studentId}  — employer only
+    public function applicantMatch(Request $request, int $jobId, int $studentId): JsonResponse
+    {
+        $user = $request->user();
+        if ($user->role !== 'employer') {
+            return response()->json(['error' => 'Employers only.'], 403);
+        }
+
+        $job = JobPosting::find($jobId);
+        if (!$job || $job->employer_id !== $user->id) {
+            return response()->json(['error' => 'Job not found.'], 404);
+        }
+
+        $student = User::with('studentProfile')->find($studentId);
+        if (!$student) {
+            return response()->json(['error' => 'Student not found.'], 404);
+        }
+
+        $studentSkills = $student->studentProfile?->skills ?? [];
+        $result = $this->ml->skillMatch($studentSkills, $job->skills_required ?? []);
 
         return response()->json(['data' => $result]);
     }

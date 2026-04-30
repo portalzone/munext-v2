@@ -5,8 +5,24 @@ export interface User {
   id: number
   name: string
   email: string
-  role: 'student' | 'employer' | 'admin'
+  role: 'student' | 'alumni' | 'employer' | 'admin'
   is_active: boolean
+  banned_at: string | null
+  ban_reason: string | null
+  employer_approved: boolean
+}
+
+export interface AuditLog {
+  id: number
+  log_name: string | null
+  description: string
+  subject_type: string | null
+  subject_id: number | null
+  causer_type: string | null
+  causer_id: number | null
+  properties: Record<string, unknown>
+  created_at: string
+  causer?: Pick<User, 'id' | 'name' | 'email'> | null
 }
 
 export interface PlatformStats {
@@ -41,6 +57,8 @@ export interface Pagination {
   last_page: number
 }
 
+export type JobType = 'full-time' | 'part-time' | 'contract' | 'internship'
+
 export interface JobPosting {
   id: number
   employer_id: number
@@ -49,6 +67,9 @@ export interface JobPosting {
   skills_required: string[]
   experience_level: 'entry' | 'mid' | 'senior'
   category: string | null
+  job_type: JobType | null
+  location: string | null
+  is_remote: boolean
   salary_min: number | null
   salary_max: number | null
   is_active: boolean
@@ -60,7 +81,10 @@ export interface JobPosting {
 export interface JobFilters {
   search?: string
   category?: string
+  job_type?: string
   experience_level?: string
+  location?: string
+  is_remote?: boolean
   salary_min?: number
   salary_max?: number
   sort?: 'newest' | 'oldest' | 'salary_high' | 'salary_low'
@@ -84,8 +108,9 @@ export interface Application {
   applied_at: string | null
   created_at: string
   updated_at: string
+  unread_messages_count?: number
   student?: Pick<User, 'id' | 'name' | 'email'>
-  job?: Pick<JobPosting, 'id' | 'title'>
+  job?: Pick<JobPosting, 'id' | 'title' | 'experience_level'>
 }
 
 export interface StudentProfile {
@@ -128,7 +153,46 @@ export interface NotificationsResponse {
   status: number
 }
 
+export interface Message {
+  id: number
+  application_id: number
+  sender_id: number
+  body: string
+  attachment_path: string | null
+  attachment_name: string | null
+  attachment_url: string | null
+  read_at: string | null
+  created_at: string
+  updated_at: string
+  sender?: Pick<User, 'id' | 'name' | 'role'>
+}
+
+export interface ThreadResponse {
+  data: Message[]
+  application: { id: number; status: Application['status']; student_id: number; job_id: number }
+  message: string
+  status: number
+}
+
+export interface EmployerProfile {
+  id: number
+  user_id: number
+  company_name: string
+  industry: string | null
+  website: string | null
+  location: string | null
+  description: string | null
+  created_at: string
+  updated_at: string
+  user?: Pick<User, 'id' | 'name' | 'email'>
+}
+
 // ML types
+
+export interface JobRecommendation {
+  score: number
+  job: JobPosting
+}
 
 export interface SkillMatch {
   score: number

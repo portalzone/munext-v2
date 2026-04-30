@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Modules\Jobs\Models\JobPosting;
 
 class MLService
 {
@@ -275,5 +276,46 @@ class MLService
             'salary_by_category' => $salaryByCategory,
             'category_trends'    => $trends,
         ];
+    }
+
+    // ─────────────────────────────────────────────
+    // Job Recommendations — reuses Algorithm 1
+    // Scores all active jobs against student skills, returns top N sorted by score
+    // Only returns jobs the student has NOT already applied to
+    // ─────────────────────────────────────────────
+    public function jobRecommendations(User $user, int $topN = 6): array
+    {
+        $studentSkills = array_map('strtolower', array_map('trim',
+            $user->studentProfile?->skills ?? []
+        ));
+
+        if (empty($studentSkills)) {
+            return [];
+        }
+
+        $appliedJobIds = \Modules\Jobs\Models\Application::where('student_id', $user->id)
+            ->pluck('job_id')
+            ->toArray();
+
+        $jobs = JobPosting::where('is_active', true)
+            ->whereNotIn('id', $appliedJobIds)
+            ->get();
+
+        $scored = $jobs->map(function (JobPosting $job) use ($studentSkills) {
+            $match = $this->skillMatch($studentSkills, $job->skills_required ?? []);
+            return [
+                'job'   => $job,
+                'score' => $match['score'],
+            ];
+        })
+        ->filter(fn($item) => $item['score'] > 0)
+        ->sortByDesc('score')
+        ->take($topN)
+        ->values();
+
+        return $scored->map(fn($item) => [
+            'score' => $item['score'],
+            'job'   => $item['job'],
+        ])->toArray();
     }
 }

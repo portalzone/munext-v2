@@ -9,15 +9,21 @@ import {
   JobFilters,
   Application,
   StudentProfile,
+  EmployerProfile,
   User,
   PlatformStats,
   SkillMatch,
+  JobRecommendation,
   ProfileStrength,
   SuccessPredictor,
   FunnelStage,
   MarketTrends,
   BookmarkStatus,
   NotificationsResponse,
+  Message,
+  ThreadResponse,
+  AuditLog,
+  Pagination,
 } from './types'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api/v1'
@@ -49,7 +55,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return json as T
 }
 
-function buildQuery(params: Record<string, string | number | undefined>): string {
+function buildQuery(params: Record<string, string | number | boolean | undefined>): string {
   const query = Object.entries(params)
     .filter(([, v]) => v !== undefined && v !== '')
     .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
@@ -76,14 +82,26 @@ export const api = {
 
     logout: () =>
       request<ApiResponse<null>>('/auth/logout', { method: 'POST' }),
+
+    forgotPassword: (email: string) =>
+      request<ApiResponse<null>>('/auth/forgot-password', {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+      }),
+
+    resetPassword: (data: { token: string; email: string; password: string; password_confirmation: string }) =>
+      request<ApiResponse<null>>('/auth/reset-password', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
   },
 
   jobs: {
     list: (filters?: JobFilters) =>
-      request<JobListResponse>(`/jobs${buildQuery({ ...filters } as Record<string, string | number | undefined>)}`),
+      request<JobListResponse>(`/jobs${buildQuery({ ...filters } as Record<string, string | number | boolean | undefined>)}`),
 
     myJobs: (params?: { sort?: string; page?: number; per_page?: number }) =>
-      request<JobListResponse>(`/jobs/my-jobs${buildQuery({ ...params } as Record<string, string | number | undefined>)}`),
+      request<JobListResponse>(`/jobs/my-jobs${buildQuery({ ...params } as Record<string, string | number | boolean | undefined>)}`),
 
     get: (id: number) =>
       request<ApiResponse<JobPosting>>(`/jobs/${id}`),
@@ -155,6 +173,24 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
+
+    uploadResume: (file: File) => {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+      const form = new FormData()
+      form.append('resume', file)
+      return fetch(`${API_BASE}/students/resume`, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: form,
+      }).then(async res => {
+        const json = await res.json()
+        if (!res.ok) throw json
+        return json as ApiResponse<{ resume_path: string; resume_url: string }>
+      })
+    },
   },
 
   admin: {
@@ -167,6 +203,26 @@ export const api = {
     toggleUser: (id: number) =>
       request<ApiResponse<User>>(`/admin/users/${id}/toggle`, { method: 'PUT' }),
 
+    promoteToAdmin: (id: number) =>
+      request<ApiResponse<User>>(`/admin/users/${id}/promote`, { method: 'PUT' }),
+
+    banUser: (id: number, reason?: string) =>
+      request<ApiResponse<User>>(`/admin/users/${id}/ban`, {
+        method: 'PUT',
+        body: JSON.stringify({ reason }),
+      }),
+
+    unbanUser: (id: number) =>
+      request<ApiResponse<User>>(`/admin/users/${id}/unban`, { method: 'PUT' }),
+
+    approveEmployer: (id: number) =>
+      request<ApiResponse<User>>(`/admin/users/${id}/approve-employer`, { method: 'PUT' }),
+
+    auditLog: (params?: { page?: number; per_page?: number }) =>
+      request<{ data: AuditLog[]; pagination: Pagination; message: string; status: number }>(
+        `/admin/audit-log${buildQuery({ ...params } as Record<string, string | number | undefined>)}`
+      ),
+
     jobs: (params?: { search?: string; status?: string; page?: number }) =>
       request<JobListResponse>(`/admin/jobs${buildQuery({ ...params } as Record<string, string | number | undefined>)}`),
 
@@ -175,6 +231,23 @@ export const api = {
 
     deleteJob: (id: number) =>
       request<ApiResponse<null>>(`/admin/jobs/${id}`, { method: 'DELETE' }),
+  },
+
+  employer: {
+    getProfile: () =>
+      request<ApiResponse<EmployerProfile | null>>('/employer/profile'),
+
+    createProfile: (data: Pick<EmployerProfile, 'company_name' | 'industry' | 'website' | 'location' | 'description'>) =>
+      request<ApiResponse<EmployerProfile>>('/employer/profile', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    updateProfile: (data: Partial<Pick<EmployerProfile, 'company_name' | 'industry' | 'website' | 'location' | 'description'>>) =>
+      request<ApiResponse<EmployerProfile>>('/employer/profile', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
   },
 
   notifications: {
@@ -188,9 +261,56 @@ export const api = {
       request<ApiResponse<null>>('/notifications/read-all', { method: 'PUT' }),
   },
 
+  messages: {
+    thread: (applicationId: number) =>
+      request<ThreadResponse>(`/messages/${applicationId}`),
+
+    send: (applicationId: number, body: string, attachment?: File) => {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+      const form  = new FormData()
+      form.append('body', body)
+      if (attachment) form.append('attachment', attachment)
+      return fetch(`${API_BASE}/messages/${applicationId}`, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: form,
+      }).then(async res => {
+        const json = await res.json()
+        if (!res.ok) throw json
+        return json as ApiResponse<Message>
+      })
+    },
+
+    unreadCount: () =>
+      request<ApiResponse<{ unread_count: number }>>('/messages/unread-count'),
+
+    broadcast: (jobId: number, body: string) =>
+      request<ApiResponse<{ sent_to: number }>>(`/messages/broadcast/${jobId}`, {
+        method: 'POST',
+        body: JSON.stringify({ body }),
+      }),
+  },
+
+  contact: {
+    send: (data: { name: string; email: string; subject: string; message: string }) =>
+      request<{ message: string; status: number }>('/contact', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+  },
+
   ml: {
     skillMatch: (jobId: number) =>
       request<ApiResponse<SkillMatch>>(`/ml/match/${jobId}`),
+
+    applicantMatch: (jobId: number, studentId: number) =>
+      request<ApiResponse<SkillMatch>>(`/ml/match/${jobId}/applicant/${studentId}`),
+
+    jobRecommendations: (top?: number) =>
+      request<ApiResponse<JobRecommendation[]>>(`/ml/recommendations${top ? `?top=${top}` : ''}`),
 
     profileStrength: () =>
       request<ApiResponse<ProfileStrength>>('/ml/profile-strength'),
