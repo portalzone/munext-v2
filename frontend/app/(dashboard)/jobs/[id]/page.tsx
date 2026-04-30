@@ -189,6 +189,39 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           </div>
         </div>
 
+        {/* Company Profile */}
+        {job.employer_profile && (
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">About the Company</h2>
+            <h3 className="text-lg font-bold text-gray-900">{job.employer_profile.company_name}</h3>
+            <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-gray-500">
+              {job.employer_profile.industry && <span>{job.employer_profile.industry}</span>}
+              {job.employer_profile.location && (
+                <>
+                  <span className="text-gray-300">·</span>
+                  <span>{job.employer_profile.location}</span>
+                </>
+              )}
+              {job.employer_profile.website && (
+                <>
+                  <span className="text-gray-300">·</span>
+                  <a
+                    href={job.employer_profile.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[#1a3a5c] hover:underline"
+                  >
+                    {job.employer_profile.website.replace(/^https?:\/\//, '')}
+                  </a>
+                </>
+              )}
+            </div>
+            {job.employer_profile.description && (
+              <p className="mt-3 text-sm text-gray-600 leading-relaxed">{job.employer_profile.description}</p>
+            )}
+          </div>
+        )}
+
         {/* Cover Letter Form */}
         {showApplyForm && !applied && (
           <div className="bg-white rounded-xl p-6 shadow-sm border border-[#1a3a5c]">
