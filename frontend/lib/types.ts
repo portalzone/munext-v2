@@ -76,6 +76,13 @@ export interface JobPosting {
   created_at: string
   updated_at: string
   employer?: Pick<User, 'id' | 'name' | 'email'>
+  employer_profile?: {
+    company_name: string
+    industry: string | null
+    website: string | null
+    location: string | null
+    description: string | null
+  } | null
 }
 
 export interface JobFilters {

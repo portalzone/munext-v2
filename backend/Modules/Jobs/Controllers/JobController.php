@@ -114,7 +114,7 @@ class JobController extends Controller
     // Any authenticated user can view a single job posting
     public function show(JobPosting $job): JsonResponse
     {
-        $job->load('employer:id,name,email');
+        $job->load('employer:id,name,email', 'employerProfile');
 
         return response()->json([
             'data'    => $job,

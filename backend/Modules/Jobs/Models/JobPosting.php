@@ -5,6 +5,7 @@ namespace Modules\Jobs\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\User;
+use Modules\Employer\Models\EmployerProfile;
 
 class JobPosting extends Model
 {
@@ -33,9 +34,20 @@ class JobPosting extends Model
         'salary_max'      => 'integer',
     ];
 
-    // A job posting belongs to an employer (User)
     public function employer()
     {
         return $this->belongsTo(User::class, 'employer_id');
+    }
+
+    public function employerProfile()
+    {
+        return $this->hasOneThrough(
+            EmployerProfile::class,
+            User::class,
+            'id',
+            'user_id',
+            'employer_id',
+            'id'
+        );
     }
 }
