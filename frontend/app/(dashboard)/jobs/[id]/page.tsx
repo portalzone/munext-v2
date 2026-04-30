@@ -1,7 +1,7 @@
 'use client'
 
 import { use, useState } from 'react'
-import { useQuery, useMutation } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { api } from '@/lib/api'
 import { ApiError } from '@/lib/types'
@@ -23,6 +23,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const [coverLetter, setCoverLetter]     = useState('')
   const [applyError, setApplyError]       = useState<string | null>(null)
   const [applied, setApplied]             = useState(false)
+  const queryClient = useQueryClient()
 
   const { data: jobData, isLoading: jobLoading } = useQuery({
     queryKey: ['job', jobId],
@@ -33,6 +34,35 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
     queryKey: ['match', jobId],
     queryFn: () => api.jobs.match(jobId),
   })
+
+  const { data: predictorData } = useQuery({
+    queryKey: ['predictor', jobId],
+    queryFn: () => api.ml.successPredictor(jobId),
+  })
+
+  const { data: meData } = useQuery({
+    queryKey: ['me'],
+    queryFn: () => api.auth.me(),
+    retry: false,
+  })
+
+  const isStudent = meData?.data.role === 'student'
+
+  const { data: bookmarkData } = useQuery({
+    queryKey: ['bookmark', jobId],
+    queryFn: () => api.jobs.bookmarkStatus(jobId),
+    enabled: isStudent,
+  })
+
+  const bookmarkMutation = useMutation({
+    mutationFn: () => api.jobs.toggleBookmark(jobId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bookmark', jobId] })
+      queryClient.invalidateQueries({ queryKey: ['bookmarks'] })
+    },
+  })
+
+  const saved = bookmarkData?.data.bookmarked ?? false
 
   const applyMutation = useMutation({
     mutationFn: () => api.jobs.apply(jobId, coverLetter),
@@ -104,18 +134,38 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               </div>
             </div>
 
-            {applied ? (
-              <span className="shrink-0 bg-green-50 text-green-700 px-5 py-2.5 rounded-lg text-sm font-semibold">
-                Applied ✓
-              </span>
-            ) : (
-              <button
-                onClick={() => { setShowApplyForm(true); setApplyError(null) }}
-                className="shrink-0 bg-[#1a3a5c] text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#15304d] transition-colors"
-              >
-                Apply Now
-              </button>
-            )}
+            <div className="flex items-center gap-2 shrink-0">
+              {isStudent && (
+                <button
+                  onClick={() => bookmarkMutation.mutate()}
+                  disabled={bookmarkMutation.isPending}
+                  title={saved ? 'Remove bookmark' : 'Save job'}
+                  className={`flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-semibold border transition-colors disabled:opacity-50 ${
+                    saved
+                      ? 'bg-[#1a3a5c] text-white border-[#1a3a5c] hover:bg-[#15304d]'
+                      : 'bg-white text-[#1a3a5c] border-[#1a3a5c] hover:bg-blue-50'
+                  }`}
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill={saved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
+                    <path d="M5 4a2 2 0 0 0-2 2v14l9-4 9 4V6a2 2 0 0 0-2-2H5z"/>
+                  </svg>
+                  {saved ? 'Saved' : 'Save'}
+                </button>
+              )}
+
+              {applied ? (
+                <span className="bg-green-50 text-green-700 px-5 py-2.5 rounded-lg text-sm font-semibold">
+                  Applied ✓
+                </span>
+              ) : (
+                <button
+                  onClick={() => { setShowApplyForm(true); setApplyError(null) }}
+                  className="bg-[#1a3a5c] text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#15304d] transition-colors"
+                >
+                  Apply Now
+                </button>
+              )}
+            </div>
           </div>
 
           <p className="mt-4 text-sm text-gray-600 leading-relaxed">{job.description}</p>
@@ -173,6 +223,64 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             </div>
           </div>
         )}
+
+        {/* Success Predictor */}
+        {predictorData?.data && (() => {
+          const p = predictorData.data
+          const confidenceColor = p.confidence === 'High'
+            ? 'text-green-600' : p.confidence === 'Medium'
+            ? 'text-yellow-600' : 'text-red-500'
+          const barColor = p.confidence === 'High'
+            ? 'bg-green-500' : p.confidence === 'Medium'
+            ? 'bg-yellow-400' : 'bg-red-400'
+          const factors = [
+            { label: 'Skill match',          value: p.factors.skill_match },
+            { label: 'Profile strength',     value: p.factors.profile },
+            { label: 'Employer selectivity', value: p.factors.selectivity },
+          ]
+          return (
+            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">Success Predictor</h2>
+                <div className="text-right">
+                  <span className={`text-3xl font-bold ${confidenceColor}`}>{p.probability}%</span>
+                  <p className={`text-xs font-semibold mt-0.5 ${confidenceColor}`}>{p.confidence} chance</p>
+                </div>
+              </div>
+
+              <div className="w-full bg-gray-100 rounded-full h-2.5 mb-5">
+                <div className={`h-2.5 rounded-full transition-all ${barColor}`} style={{ width: `${p.probability}%` }} />
+              </div>
+
+              <div className="space-y-2.5 mb-4">
+                {factors.map(f => (
+                  <div key={f.label}>
+                    <div className="flex justify-between text-xs text-gray-500 mb-1">
+                      <span>{f.label}</span>
+                      <span>{f.value}%</span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-1.5">
+                      <div className="bg-[#1a3a5c] h-1.5 rounded-full" style={{ width: `${f.value}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {p.suggestions.length > 0 && (
+                <div className="bg-blue-50 rounded-lg p-3">
+                  <p className="text-xs font-semibold text-blue-700 mb-1.5">How to improve your chances:</p>
+                  <ul className="space-y-1">
+                    {p.suggestions.map((s, i) => (
+                      <li key={i} className="text-xs text-blue-700 flex gap-1.5">
+                        <span>→</span><span>{s}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )
+        })()}
 
         {/* Skill Match Results */}
         {matchLoading ? (

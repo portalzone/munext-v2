@@ -5,23 +5,45 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { StudentProfile } from '@/lib/types'
 
+const STRENGTH_COLORS: Record<string, string> = {
+  Weak:      'text-red-600',
+  Fair:      'text-orange-500',
+  Good:      'text-yellow-600',
+  Strong:    'text-blue-600',
+  Excellent: 'text-green-600',
+}
+
+const STRENGTH_BG: Record<string, string> = {
+  Weak:      'bg-red-500',
+  Fair:      'bg-orange-400',
+  Good:      'bg-yellow-400',
+  Strong:    'bg-blue-500',
+  Excellent: 'bg-green-500',
+}
+
 type ProfileForm = Omit<StudentProfile, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'user'>
 
 export default function ProfilePage() {
   const queryClient = useQueryClient()
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState<ProfileForm>({
-    program: '',
-    gpa: null,
+    program:         '',
+    gpa:             null,
     graduation_year: new Date().getFullYear() + 1,
-    skills: [],
+    skills:          [],
+    resume_path:     null,
   })
   const [skillInput, setSkillInput] = useState('')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const { data, isLoading } = useQuery({
     queryKey: ['my-profile'],
-    queryFn: () => api.students.list(),
+    queryFn: () => api.students.myProfile(),
+  })
+
+  const { data: strengthData } = useQuery({
+    queryKey: ['profile-strength'],
+    queryFn: () => api.ml.profileStrength(),
   })
 
   const createMutation = useMutation({
@@ -64,10 +86,11 @@ export default function ProfilePage() {
   function startEdit(profile?: StudentProfile) {
     if (profile) {
       setForm({
-        program: profile.program,
-        gpa: profile.gpa,
+        program:         profile.program,
+        gpa:             profile.gpa,
         graduation_year: profile.graduation_year,
-        skills: profile.skills,
+        skills:          profile.skills,
+        resume_path:     profile.resume_path,
       })
     }
     setEditing(true)
@@ -88,10 +111,7 @@ export default function ProfilePage() {
     )
   }
 
-  // Find the current user's profile from the list
-  // In a real app we'd have a /me endpoint — for now we grab the first result
-  const profiles = data?.data ?? []
-  const profile = profiles.length > 0 ? profiles[0] : null
+  const profile = data?.data ?? null
 
   if (!profile && !editing) {
     return (
@@ -261,6 +281,66 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
+
+        {/* Profile Strength Card */}
+        {strengthData?.data && (() => {
+          const s = strengthData.data
+          const breakdown = [
+            { label: 'Profile completeness', value: s.breakdown.completeness, max: 30 },
+            { label: 'Skills count',          value: s.breakdown.skills,       max: 25 },
+            { label: 'Resume uploaded',       value: s.breakdown.resume,       max: 20 },
+            { label: 'Application activity',  value: s.breakdown.activity,     max: 25 },
+          ]
+          return (
+            <div className="mt-6 bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="text-base font-semibold text-gray-900">Profile Strength</h2>
+                <div className="text-right">
+                  <span className={`text-2xl font-bold ${STRENGTH_COLORS[s.label] ?? 'text-gray-700'}`}>
+                    {s.score}
+                  </span>
+                  <span className="text-gray-400 text-sm">/100</span>
+                  <p className={`text-xs font-semibold mt-0.5 ${STRENGTH_COLORS[s.label] ?? 'text-gray-500'}`}>
+                    {s.label}
+                  </p>
+                </div>
+              </div>
+
+              {/* Overall bar */}
+              <div className="w-full bg-gray-100 rounded-full h-2.5 mb-5">
+                <div
+                  className={`h-2.5 rounded-full transition-all ${STRENGTH_BG[s.label] ?? 'bg-gray-400'}`}
+                  style={{ width: `${s.score}%` }}
+                />
+              </div>
+
+              {/* Component breakdown */}
+              <div className="space-y-3">
+                {breakdown.map(item => (
+                  <div key={item.label}>
+                    <div className="flex justify-between text-xs text-gray-500 mb-1">
+                      <span>{item.label}</span>
+                      <span>{item.value}/{item.max}</span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-1.5">
+                      <div
+                        className="bg-[#1a3a5c] h-1.5 rounded-full transition-all"
+                        style={{ width: `${(item.value / item.max) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {s.score < 100 && (
+                <p className="mt-4 text-xs text-gray-400">
+                  {s.breakdown.resume === 0 && 'Upload a resume to gain 20 points. '}
+                  {s.breakdown.skills < 25 && `Add ${Math.ceil(((25 - s.breakdown.skills) / 25) * 10)} more skills to improve your score. `}
+                </p>
+              )}
+            </div>
+          )
+        })()}
       </div>
     </main>
   )

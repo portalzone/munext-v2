@@ -346,7 +346,7 @@ export default function AdminPage() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="category" tick={{ fontSize: 11 }} angle={-30} textAnchor="end" interval={0} />
                     <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
-                    <Tooltip formatter={(v: number) => `$${v.toLocaleString()}`} />
+                    <Tooltip formatter={(v) => typeof v === 'number' ? `$${v.toLocaleString()}` : v} />
                     <Bar dataKey="avg_min" fill="#93c5fd" radius={[4, 4, 0, 0]} name="Avg min salary" />
                     <Bar dataKey="avg_max" fill="#1a3a5c" radius={[4, 4, 0, 0]} name="Avg max salary" />
                   </BarChart>

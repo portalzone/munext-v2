@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { JobFilters, JobPosting } from '@/lib/types'
 
@@ -44,10 +44,32 @@ function formatSalary(min: number | null, max: number | null): string | null {
 export default function JobsPage() {
   const [filters, setFilters] = useState<JobFilters>({ page: 1, per_page: 15 })
   const [search, setSearch] = useState('')
+  const queryClient = useQueryClient()
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['jobs', filters],
     queryFn: () => api.jobs.list(filters),
+  })
+
+  const { data: meData } = useQuery({
+    queryKey: ['me'],
+    queryFn: () => api.auth.me(),
+    retry: false,
+  })
+
+  const isStudent = meData?.data.role === 'student'
+
+  const { data: bookmarksData } = useQuery({
+    queryKey: ['bookmarks'],
+    queryFn: () => api.jobs.bookmarks(),
+    enabled: isStudent,
+  })
+
+  const bookmarkedIds = new Set(bookmarksData?.data.map((j) => j.id) ?? [])
+
+  const bookmarkMutation = useMutation({
+    mutationFn: (jobId: number) => api.jobs.toggleBookmark(jobId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['bookmarks'] }),
   })
 
   function applySearch(e: React.FormEvent) {
@@ -224,7 +246,9 @@ export default function JobsPage() {
             {!isLoading && !isError && jobs.length > 0 && (
               <div className="space-y-4">
                 {jobs.map((job) => {
-                  const salary = formatSalary(job.salary_min, job.salary_max)
+                  const salary     = formatSalary(job.salary_min, job.salary_max)
+                  const saved      = bookmarkedIds.has(job.id)
+                  const isPending  = bookmarkMutation.isPending && bookmarkMutation.variables === job.id
                   return (
                     <a
                       key={job.id}
@@ -252,9 +276,33 @@ export default function JobsPage() {
                             )}
                           </div>
                         </div>
-                        <span className={`shrink-0 text-xs font-medium px-2.5 py-1 rounded-full ${LEVEL_COLORS[job.experience_level]}`}>
-                          {LEVEL_LABELS[job.experience_level]}
-                        </span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {isStudent && (
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                bookmarkMutation.mutate(job.id)
+                              }}
+                              disabled={isPending}
+                              title={saved ? 'Remove bookmark' : 'Save job'}
+                              className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
+                            >
+                              {saved ? (
+                                <svg className="w-5 h-5 text-[#1a3a5c]" viewBox="0 0 24 24" fill="currentColor">
+                                  <path d="M5 4a2 2 0 0 0-2 2v14l9-4 9 4V6a2 2 0 0 0-2-2H5z"/>
+                                </svg>
+                              ) : (
+                                <svg className="w-5 h-5 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M5 4a2 2 0 0 0-2 2v14l9-4 9 4V6a2 2 0 0 0-2-2H5z"/>
+                                </svg>
+                              )}
+                            </button>
+                          )}
+                          <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${LEVEL_COLORS[job.experience_level]}`}>
+                            {LEVEL_LABELS[job.experience_level]}
+                          </span>
+                        </div>
                       </div>
 
                       <p className="mt-3 text-sm text-gray-600 line-clamp-2">{job.description}</p>

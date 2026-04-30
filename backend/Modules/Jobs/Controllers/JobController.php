@@ -139,6 +139,9 @@ class JobController extends Controller
             'is_active'   => true,
         ]);
 
+        activity()->causedBy($request->user())->performedOn($job)
+            ->log("Created job posting \"{$job->title}\"");
+
         return response()->json([
             'data'    => $job,
             'message' => 'Job posting created successfully',
@@ -188,6 +191,9 @@ class JobController extends Controller
                 'status'  => 403,
             ], 403);
         }
+
+        activity()->causedBy($request->user())
+            ->log("Deleted job posting \"{$job->title}\"");
 
         $job->delete();
 

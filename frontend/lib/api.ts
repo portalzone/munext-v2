@@ -16,6 +16,8 @@ import {
   SuccessPredictor,
   FunnelStage,
   MarketTrends,
+  BookmarkStatus,
+  NotificationsResponse,
 } from './types'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api/v1'
@@ -121,9 +123,21 @@ export const api = {
 
     myApplications: () =>
       request<ApiResponse<Application[]>>('/jobs/my-applications'),
+
+    bookmarks: () =>
+      request<ApiResponse<JobPosting[]>>('/jobs/bookmarks'),
+
+    bookmarkStatus: (id: number) =>
+      request<ApiResponse<BookmarkStatus>>(`/jobs/${id}/bookmark`),
+
+    toggleBookmark: (id: number) =>
+      request<ApiResponse<BookmarkStatus>>(`/jobs/${id}/bookmark`, { method: 'POST' }),
   },
 
   students: {
+    myProfile: () =>
+      request<ApiResponse<StudentProfile | null>>('/students/my-profile'),
+
     list: () =>
       request<ApiResponse<StudentProfile[]>>('/students'),
 
@@ -161,6 +175,17 @@ export const api = {
 
     deleteJob: (id: number) =>
       request<ApiResponse<null>>(`/admin/jobs/${id}`, { method: 'DELETE' }),
+  },
+
+  notifications: {
+    list: () =>
+      request<NotificationsResponse>('/notifications'),
+
+    markRead: (id: number) =>
+      request<ApiResponse<null>>(`/notifications/${id}/read`, { method: 'PUT' }),
+
+    markAllRead: () =>
+      request<ApiResponse<null>>('/notifications/read-all', { method: 'PUT' }),
   },
 
   ml: {

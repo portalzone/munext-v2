@@ -9,6 +9,20 @@ use Modules\Students\Models\StudentProfile;
 
 class StudentProfileController extends Controller
 {
+    // Returns only the authenticated student's own profile
+    public function myProfile(Request $request): JsonResponse
+    {
+        $profile = StudentProfile::with('user:id,name,email')
+            ->where('user_id', $request->user()->id)
+            ->first();
+
+        return response()->json([
+            'data'    => $profile,
+            'message' => $profile ? 'Profile retrieved successfully' : 'No profile found',
+            'status'  => 200,
+        ]);
+    }
+
     // Any authenticated user can view all student profiles
     public function index(): JsonResponse
     {

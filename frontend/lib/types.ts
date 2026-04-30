@@ -107,6 +107,27 @@ export interface ApiResponse<T> {
   status: number
 }
 
+export interface BookmarkStatus {
+  bookmarked: boolean
+}
+
+export interface AppNotification {
+  id: number
+  user_id: number
+  type: string
+  message: string
+  read_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface NotificationsResponse {
+  data: AppNotification[]
+  unread_count: number
+  message: string
+  status: number
+}
+
 // ML types
 
 export interface SkillMatch {

@@ -7,6 +7,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\Jobs\Models\Application;
 use Modules\Jobs\Models\JobPosting;
+use Modules\Notifications\Models\Notification;
 
 class ApplicationController extends Controller
 {
@@ -43,6 +44,9 @@ class ApplicationController extends Controller
             'status'       => 'pending',
             'cover_letter' => $validated['cover_letter'],
         ]);
+
+        activity()->causedBy($request->user())->performedOn($application)
+            ->log("Applied to job \"{$job->title}\"");
 
         return response()->json([
             'data'    => $application,
@@ -89,6 +93,23 @@ class ApplicationController extends Controller
         ]);
 
         $application->update($validated);
+
+        $statusLabels = [
+            'pending'     => 'is under review',
+            'reviewed'    => 'has been reviewed',
+            'shortlisted' => 'has been shortlisted',
+            'rejected'    => 'was not selected',
+            'hired'       => 'has been accepted — congratulations!',
+        ];
+
+        Notification::create([
+            'user_id' => $application->student_id,
+            'type'    => 'application_status_changed',
+            'message' => "Your application for \"{$job->title}\" {$statusLabels[$validated['status']]}.",
+        ]);
+
+        activity()->causedBy($request->user())->performedOn($application)
+            ->log("Set application status to \"{$validated['status']}\" for job \"{$job->title}\"");
 
         return response()->json([
             'data'    => $application->fresh(),
