@@ -1,10 +1,9 @@
 import type { NextConfig } from "next";
-import path from "path";
 
 const nextConfig: NextConfig = {
-  turbopack: {
-    root: path.resolve(__dirname),
-  },
+  // 'standalone' bundles everything needed to run on a Node.js server
+  // without requiring node_modules — ideal for Hostinger Node.js app deployment
+  output: process.env.NODE_ENV === "production" ? "standalone" : undefined,
 };
 
 export default nextConfig;
