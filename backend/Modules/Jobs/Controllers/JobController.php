@@ -54,8 +54,8 @@ class JobController extends Controller
 
         if ($search = $request->query('search')) {
             $query->where(function ($q) use ($search) {
-                $q->where('title', 'ilike', "%{$search}%")
-                  ->orWhere('description', 'ilike', "%{$search}%");
+                $q->where('title', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%");
             });
         }
 
@@ -72,7 +72,7 @@ class JobController extends Controller
         }
 
         if ($location = $request->query('location')) {
-            $query->where('location', 'ilike', "%{$location}%");
+            $query->where('location', 'like', "%{$location}%");
         }
 
         if ($request->query('is_remote') === 'true') {
@@ -90,8 +90,8 @@ class JobController extends Controller
         $sort = $request->query('sort', 'newest');
         match ($sort) {
             'oldest'         => $query->oldest(),
-            'salary_high'    => $query->orderByRaw('salary_max DESC NULLS LAST'),
-            'salary_low'     => $query->orderByRaw('salary_min ASC NULLS LAST'),
+            'salary_high'    => $query->orderByRaw('ISNULL(salary_max), salary_max DESC'),
+            'salary_low'     => $query->orderByRaw('ISNULL(salary_min), salary_min ASC'),
             default          => $query->latest(),
         };
 
