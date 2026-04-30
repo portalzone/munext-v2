@@ -61,10 +61,17 @@ export default function EmployerDashboard() {
   const [sort, setSort] = useState('newest')
   const [page, setPage] = useState(1)
 
+  const { data: meData } = useQuery({
+    queryKey: ['me'],
+    queryFn: () => api.auth.me(),
+  })
+
   const { data, isLoading } = useQuery({
     queryKey: ['my-jobs', sort, page],
     queryFn: () => api.jobs.myJobs({ sort, page, per_page: 10 }),
   })
+
+  const isApproved = meData?.data?.employer_approved ?? false
 
   const { data: funnelData } = useQuery({
     queryKey: ['hiring-funnel'],
@@ -169,7 +176,7 @@ export default function EmployerDashboard() {
               <option value="active">Active first</option>
               <option value="inactive">Inactive first</option>
             </select>
-            {!showForm && (
+            {!showForm && isApproved && (
               <button
                 onClick={() => setShowForm(true)}
                 className="bg-[#1a3a5c] text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#15304d] transition-colors"
@@ -180,8 +187,16 @@ export default function EmployerDashboard() {
           </div>
         </div>
 
+        {/* Approval banner */}
+        {!isApproved && (
+          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
+            <p className="font-semibold">Your account is pending admin approval.</p>
+            <p className="mt-1 text-amber-700">You will be able to post jobs once an admin approves your employer account.</p>
+          </div>
+        )}
+
         {/* Job Form */}
-        {showForm && (
+        {showForm && isApproved && (
           <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 mb-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-5">
               {editingJob ? 'Edit Job Posting' : 'New Job Posting'}
