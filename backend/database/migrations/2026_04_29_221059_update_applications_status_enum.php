@@ -1,25 +1,26 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
-        DB::statement("ALTER TABLE applications DROP CONSTRAINT applications_status_check");
-        DB::statement("ALTER TABLE applications ADD CONSTRAINT applications_status_check CHECK (status IN ('pending','reviewed','shortlisted','rejected','hired'))");
+        Schema::table('applications', function (Blueprint $table) {
+            $table->enum('status', ['pending', 'reviewed', 'shortlisted', 'rejected', 'hired'])
+                  ->default('pending')
+                  ->change();
+        });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
-        DB::statement("ALTER TABLE applications DROP CONSTRAINT applications_status_check");
-        DB::statement("ALTER TABLE applications ADD CONSTRAINT applications_status_check CHECK (status IN ('pending','reviewed','accepted','rejected'))");
+        Schema::table('applications', function (Blueprint $table) {
+            $table->enum('status', ['pending', 'reviewed', 'accepted', 'rejected'])
+                  ->default('pending')
+                  ->change();
+        });
     }
 };

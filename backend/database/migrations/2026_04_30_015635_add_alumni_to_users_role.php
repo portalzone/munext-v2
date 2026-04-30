@@ -6,18 +6,21 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
-        DB::statement("ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check");
-        DB::statement("ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('student', 'employer', 'admin', 'alumni'))");
+        Schema::table('users', function (Blueprint $table) {
+            $table->enum('role', ['student', 'employer', 'admin', 'alumni'])
+                  ->default('student')
+                  ->change();
+        });
     }
 
     public function down(): void
     {
-        DB::statement("ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check");
-        DB::statement("ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('student', 'employer', 'admin'))");
+        Schema::table('users', function (Blueprint $table) {
+            $table->enum('role', ['student', 'employer', 'admin'])
+                  ->default('student')
+                  ->change();
+        });
     }
 };
