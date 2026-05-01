@@ -1,6 +1,12 @@
 # Project 2 — DataFlow Analytics Engine
 # CLAUDE.md — Read this before every session
 
+## Current Status
+- Started: 2026-04-30
+- Active sprint: Week 1 — Spark Docker setup + first pipeline (jobs_analytics.py)
+- Last session: First session — beginning from scratch
+- Next task: Set up local Spark Docker environment, then write jobs_analytics.py
+
 ## Who I am
 Victor Muojeke. Full-Stack Software Engineer, MASc candidate at Memorial University.
 I completed Project 1 — MUNext v2 is live at munext.basepan.com (Next.js) and
