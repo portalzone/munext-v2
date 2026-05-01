@@ -1,6 +1,8 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { JobPosting, JobType } from '@/lib/types'
@@ -31,12 +33,19 @@ function formatDate(dateStr: string): string {
 
 export default function HomePage() {
   const queryClient = useQueryClient()
+  const router = useRouter()
 
   const { data: meData } = useQuery({
     queryKey: ['me'],
     queryFn: () => api.auth.me(),
     retry: false,
   })
+
+  useEffect(() => {
+    if (meData?.data) {
+      router.replace('/jobs')
+    }
+  }, [meData, router])
 
   const isStudent = meData?.data.role === 'student' || meData?.data.role === 'alumni'
 
