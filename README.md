@@ -10,10 +10,10 @@ Employers post jobs and manage applicants through a hiring pipeline. Admins mode
 |---|---|
 | Backend | Laravel 13, PHP 8.3, Sanctum, Spatie Activity Log |
 | Frontend | Next.js 16, TypeScript, TanStack Query, Recharts |
-| Database | PostgreSQL 16 |
-| Queue | Laravel database queue + Docker worker service |
+| Database | MySQL (production) / PostgreSQL 16 (local Docker) |
+| Queue | Laravel database queue + cron worker |
 | Testing | Pest |
-| DevOps | Docker, Docker Compose, Nginx |
+| DevOps | Docker, Docker Compose, Nginx (local) / Hostinger (production) |
 
 ## Project Structure
 
@@ -254,6 +254,7 @@ All routes prefixed `/api/v1/`. Sanctum token in `Authorization: Bearer <token>`
 ### Employer
 - Post, edit, deactivate job listings with salary range and category
 - Must be approved by an admin before posting jobs
+- Company profile (name, industry, location, website, description) shown on every job listing
 - View applicants per job with cover letter
 - Move applicants through hiring pipeline (pending → reviewed → shortlisted → hired/rejected)
 - Hiring funnel analytics chart (Algorithm 3)
@@ -295,9 +296,37 @@ All algorithms live in `backend/app/Services/MLService.php`. No Python, no exter
 | 4 | Application success predictor | `GET /ml/predict/{jobId}` | Job detail page |
 | 5 | EWMA market trend analysis | `GET /ml/trends` | Admin ML dashboard |
 
+## Production Deployment (Hostinger)
+
+Live at:
+- Frontend: https://munext.basepan.com (Hostinger Node.js app)
+- Backend API: https://api.basepan.com (Hostinger shared hosting, PHP 8.3)
+
+**Backend setup**
+1. Upload `backend/` contents to `public_html/` on `api.basepan.com`
+2. Create `public_html/.env` from `.env.example` — set MySQL credentials, `APP_URL`, `FRONTEND_URL=https://munext.basepan.com`, and SMTP settings
+3. Run via SSH (use `/opt/alt/php83/usr/bin/php` for PHP 8.3):
+```bash
+/opt/alt/php83/usr/bin/php artisan key:generate
+/opt/alt/php83/usr/bin/php artisan migrate
+/opt/alt/php83/usr/bin/php artisan storage:link
+/opt/alt/php83/usr/bin/php artisan config:cache
+/opt/alt/php83/usr/bin/php artisan route:cache
+```
+4. Add a cron job (every minute) in hPanel:
+```
+/opt/alt/php83/usr/bin/php /home/u144904804/public_html/artisan queue:work --stop-when-empty
+```
+
+**Frontend setup**
+1. Zip the `frontend/` source (exclude `node_modules/` and `.next/`)
+2. Upload to Hostinger Node.js app for `munext.basepan.com`
+3. Set environment variable: `NEXT_PUBLIC_API_URL=https://api.basepan.com/api/v1`
+4. Redeploy — Hostinger runs `npm install && npm run build && npm start`
+
 ## Troubleshooting
 
-**Emails not sending**
+**Emails not sending (local)**
 The queue worker container (`munext_worker`) must be running. Check with:
 ```bash
 docker compose ps
@@ -306,6 +335,9 @@ If stopped, restart with `docker compose up worker`. Confirm your SMTP credentia
 ```bash
 docker compose exec app php artisan config:clear
 ```
+
+**Emails not sending (production)**
+Check that the Hostinger cron job is active and the SMTP credentials in `public_html/.env` are correct. Run `/opt/alt/php83/usr/bin/php artisan config:clear` via SSH after any `.env` change.
 
 **Migrations fail / DB connection refused**
 Wait ~10 seconds after `docker compose up` for PostgreSQL to be ready, then run:
