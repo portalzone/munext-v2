@@ -1,0 +1,4 @@
+.env
+jars/*.jar
+__pycache__/
+*.pyc

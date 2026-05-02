@@ -1,0 +1,7 @@
+services:
+  spark:
+    build: .
+    env_file: .env
+    volumes:
+      - .:/spark
+    command: ["python", "pipelines/jobs_analytics.py"]
