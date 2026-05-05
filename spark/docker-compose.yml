@@ -5,3 +5,17 @@ services:
     volumes:
       - .:/spark
     command: ["python", "pipelines/jobs_analytics.py"]
+
+  skills:
+    build: .
+    env_file: .env
+    volumes:
+      - .:/spark
+    command: ["python", "pipelines/skills_demand.py"]
+
+  trends:
+    build: .
+    env_file: .env
+    volumes:
+      - .:/spark
+    command: ["python", "pipelines/hiring_trends.py"]

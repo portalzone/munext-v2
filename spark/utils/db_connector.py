@@ -10,7 +10,7 @@ import os
 from pyspark.sql import SparkSession, DataFrame
 
 
-JDBC_DRIVER_PATH = "/spark/jars/mysql-connector-j-8.3.0.jar"
+JDBC_DRIVER_PATH = "/spark/jars/mysql-connector-j-9.7.0.jar"
 
 
 def get_spark(app_name: str) -> SparkSession:
