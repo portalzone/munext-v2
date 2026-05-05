@@ -3,6 +3,7 @@
 A professional job board platform connecting Memorial University students with employers.
 Students browse jobs, check skill match scores, apply with cover letters, and track application status.
 Employers post jobs and manage applicants through a hiring pipeline. Admins moderate the platform and view ML analytics.
+A daily Spark pipeline computes market analytics (skills demand, hiring trends, salary distribution) and surfaces them on a live dashboard.
 
 ## Tech Stack
 
@@ -11,9 +12,33 @@ Employers post jobs and manage applicants through a hiring pipeline. Admins mode
 | Backend | Laravel 13, PHP 8.3, Sanctum, Spatie Activity Log |
 | Frontend | Next.js 16, TypeScript, TanStack Query, Recharts |
 | Database | MySQL (production) / PostgreSQL 16 (local Docker) |
+| Analytics | Apache Spark 3 (PySpark), JDBC, GitHub Actions cron |
 | Queue | Laravel database queue + cron worker |
 | Testing | Pest |
 | DevOps | Docker, Docker Compose, Nginx (local) / Hostinger (production) |
+
+## Data Flow
+
+```
+MySQL (job_postings, applications)
+        │
+        │  daily at 3am UTC (GitHub Actions)
+        ▼
+  PySpark pipelines
+  ┌─────────────────────┐
+  │ jobs_analytics.py   │──► analytics_jobs_summary
+  │ skills_demand.py    │──► analytics_skills_demand
+  │ hiring_trends.py    │──► analytics_hiring_trends
+  └─────────────────────┘
+        │
+        │  Laravel reads via Eloquent
+        ▼
+  GET /api/v1/analytics/*
+        │
+        │  TanStack Query + Recharts
+        ▼
+  munext.basepan.com/analytics
+```
 
 ## Project Structure
 
@@ -24,9 +49,12 @@ munext-v2/
       Auth/           ← Register, login, logout
       Jobs/           ← Job postings, applications, bookmarks, skill match
       Students/       ← Student profiles
+      Employer/       ← Employer profiles
       ML/             ← 5 pure-PHP ML algorithms
       Admin/          ← User & job moderation, platform stats
+      Analytics/      ← 4 analytics endpoints (reads Spark output tables)
       Notifications/  ← In-app notifications
+      Messages/       ← Per-application chat threads
     app/
       Services/
         MLService.php ← All 5 ML algorithms (pure PHP, no external library)
@@ -37,14 +65,15 @@ munext-v2/
       (dashboard)/
         jobs/         ← Job listing with filters, pagination, bookmarks
         jobs/[id]/    ← Job detail, skill match chart, success predictor
-        jobs/bookmarks/  ← Saved jobs
-        profile/      ← Student profile + strength score
-        employer/     ← Employer dashboard
-        employer/applicants/[jobId]/ ← Applicant management
-        employer/messages/    ← Employer message inbox
-        messages/[applicationId]/ ← Per-application chat thread
-        admin/        ← Admin dashboard + ML analytics
-        notifications/ ← In-app notifications
+        jobs/bookmarks/          ← Saved jobs
+        profile/                 ← Student profile + strength score
+        employer/                ← Employer dashboard
+        employer/applicants/[jobId]/  ← Applicant management
+        employer/messages/       ← Employer message inbox
+        messages/[applicationId]/← Per-application chat thread
+        admin/                   ← Admin dashboard + ML analytics
+        analytics/               ← Market analytics dashboard (Recharts)
+        notifications/           ← In-app notifications
       about/          ← About Us page
       contact/        ← Contact Us (functional form)
       privacy/        ← Privacy Policy
@@ -52,6 +81,18 @@ munext-v2/
     lib/
       api.ts          ← All API calls
       types.ts        ← All TypeScript interfaces
+  spark/
+    pipelines/
+      jobs_analytics.py   ← Groups jobs by category/type/level
+      skills_demand.py    ← Explodes skills array, counts + trends
+      hiring_trends.py    ← Jobs posted vs applications per month
+    utils/
+      db_connector.py     ← JDBC helpers (get_spark, read_table, write_table)
+    docker-compose.yml    ← Local Spark runner (3 services)
+    requirements.txt
+  .github/
+    workflows/
+      spark_pipeline.yml  ← Runs all 3 pipelines daily at 3am UTC
   docker/
   docker-compose.yml
 ```
@@ -148,6 +189,28 @@ docker compose exec app php artisan tinker
 | Laravel API | http://localhost:8000/api/v1 |
 | PostgreSQL | localhost:5433 (user: `munext`, db: `munext`) |
 
+## Running the Spark Pipelines Locally
+
+Requires Docker Desktop. The MySQL JDBC driver is downloaded automatically.
+
+```bash
+cd spark
+cp .env.example .env   # fill in DB credentials
+docker compose run --rm spark   # jobs_analytics
+docker compose run --rm skills  # skills_demand
+docker compose run --rm trends  # hiring_trends
+```
+
+In production, all three run automatically every day at 3am UTC via GitHub Actions (`.github/workflows/spark_pipeline.yml`). Set these repository secrets in GitHub:
+
+| Secret | Value |
+|---|---|
+| DB_HOST | Your MySQL host |
+| DB_PORT | 3306 |
+| DB_DATABASE | Database name |
+| DB_USERNAME | MySQL user |
+| DB_PASSWORD | MySQL password |
+
 ## Running Tests
 
 ```bash
@@ -193,6 +256,14 @@ All routes prefixed `/api/v1/`. Sanctum token in `Authorization: Bearer <token>`
 | GET  | /students/my-profile | Student |
 | GET  | /students/{id} | Authenticated |
 | PUT  | /students/{id} | Profile owner |
+
+### Analytics
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | /analytics/skills-demand | Top 20 skills by count + trend (Spark) |
+| GET | /analytics/hiring-trends | Jobs posted vs applications per month (Spark) |
+| GET | /analytics/salary-distribution | Active jobs bucketed by salary range |
+| GET | /analytics/top-employers | Top 10 employers by active job count |
 
 ### ML Algorithms (pure PHP)
 | Method | Endpoint | Access | Algorithm |
@@ -250,6 +321,7 @@ All routes prefixed `/api/v1/`. Sanctum token in `Authorization: Bearer <token>`
 - Skill match chart on job detail (Algorithm 1)
 - Application success predictor (Algorithm 4)
 - In-app notifications for status changes
+- Market analytics dashboard (skills demand, hiring trends, salary ranges)
 
 ### Employer
 - Post, edit, deactivate job listings with salary range and category
@@ -274,6 +346,13 @@ All routes prefixed `/api/v1/`. Sanctum token in `Authorization: Bearer <token>`
 - File attachment support (PDF, Word, images)
 - Unread message badge in navbar and message list
 - Email notification to recipient on new message (queued)
+
+### Analytics Dashboard (`/analytics`)
+- Bar chart: top 20 skills by demand, color-coded by trend (up/down/stable)
+- Line chart: monthly jobs posted vs applications submitted
+- Pie chart: active jobs bucketed by salary range
+- Horizontal bar chart: top 10 employers by active job count
+- Data computed by Spark pipelines, updated every 24 hours
 
 ### Platform
 - Activity log (Spatie) on all sensitive actions: login, apply, status change, job create/delete, ban, promote
@@ -305,24 +384,27 @@ Live at:
 **Backend setup**
 1. Upload `backend/` contents to `public_html/` on `api.basepan.com`
 2. Create `public_html/.env` from `.env.example` — set MySQL credentials, `APP_URL`, `FRONTEND_URL=https://munext.basepan.com`, and SMTP settings
-3. Run via SSH (use `/opt/alt/php83/usr/bin/php` for PHP 8.3):
+3. Run via SSH:
 ```bash
-/opt/alt/php83/usr/bin/php artisan key:generate
-/opt/alt/php83/usr/bin/php artisan migrate
-/opt/alt/php83/usr/bin/php artisan storage:link
-/opt/alt/php83/usr/bin/php artisan config:cache
-/opt/alt/php83/usr/bin/php artisan route:cache
+/usr/selector/php-cli artisan key:generate
+/usr/selector/php-cli artisan migrate
+/usr/selector/php-cli artisan storage:link
+/usr/selector/php-cli artisan config:cache
+/usr/selector/php-cli artisan route:cache
 ```
-4. Add a cron job (every minute) in hPanel:
-```
-/opt/alt/php83/usr/bin/php /home/u144904804/public_html/artisan queue:work --stop-when-empty
-```
+4. Add a cron job (every minute) in hPanel to process the queue
 
 **Frontend setup**
 1. Zip the `frontend/` source (exclude `node_modules/` and `.next/`)
 2. Upload to Hostinger Node.js app for `munext.basepan.com`
 3. Set environment variable: `NEXT_PUBLIC_API_URL=https://api.basepan.com/api/v1`
 4. Redeploy — Hostinger runs `npm install && npm run build && npm start`
+
+**Spark pipelines (GitHub Actions)**
+1. Push the repo to GitHub
+2. Add the 5 DB secrets (DB_HOST, DB_PORT, DB_DATABASE, DB_USERNAME, DB_PASSWORD)
+3. Enable "Any Host" in Hostinger Remote MySQL settings
+4. Pipelines run automatically every day at 3am UTC, or trigger manually from the Actions tab
 
 ## Troubleshooting
 
@@ -337,7 +419,7 @@ docker compose exec app php artisan config:clear
 ```
 
 **Emails not sending (production)**
-Check that the Hostinger cron job is active and the SMTP credentials in `public_html/.env` are correct. Run `/opt/alt/php83/usr/bin/php artisan config:clear` via SSH after any `.env` change.
+Check that the Hostinger cron job is active and the SMTP credentials in `public_html/.env` are correct. Run `/usr/selector/php-cli artisan config:clear` via SSH after any `.env` change.
 
 **Migrations fail / DB connection refused**
 Wait ~10 seconds after `docker compose up` for PostgreSQL to be ready, then run:
@@ -350,6 +432,9 @@ Ensure `NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1` is set in `frontend/.e
 
 **Employer can't post jobs**
 An admin must approve the employer account first. Log in as admin, go to the Users tab in the admin panel, and click "Approve" next to the employer.
+
+**Spark pipeline fails on GitHub Actions**
+Check the Actions log. Common causes: DB secrets not set, Hostinger Remote MySQL "Any Host" not enabled, or JDBC JAR download failed (Maven Central timeout — retry the run).
 
 ## Contact
 

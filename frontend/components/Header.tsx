@@ -108,6 +108,10 @@ export default function Header() {
         </>
       )}
 
+      <Link href="/analytics" onClick={() => setMenuOpen(false)} className="hover:text-blue-200 transition-colors">
+        Analytics
+      </Link>
+
       {user.role === 'admin' && (
         <Link href="/admin" onClick={() => setMenuOpen(false)} className="hover:text-blue-200 transition-colors">
           Admin

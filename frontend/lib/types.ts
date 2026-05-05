@@ -246,6 +246,31 @@ export interface FunnelStage {
   }
 }
 
+export interface SkillDemand {
+  skill: string
+  count: number
+  trend: 'up' | 'down' | 'stable'
+  computed_at: string
+}
+
+export interface HiringTrend {
+  month: string
+  job_count: number
+  application_count: number
+  computed_at: string
+}
+
+export interface SalaryBucket {
+  salary_range: string
+  job_count: number
+}
+
+export interface TopEmployer {
+  company_name: string
+  industry: string | null
+  job_count: number
+}
+
 export interface MarketTrends {
   top_skills: Record<string, number>
   salary_by_category: {
