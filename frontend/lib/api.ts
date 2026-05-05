@@ -294,6 +294,13 @@ export const api = {
       }),
   },
 
+  analytics: {
+    skillsDemand:       () => request<{ data: import('./types').SkillDemand[] }>('/analytics/skills-demand'),
+    hiringTrends:       () => request<{ data: import('./types').HiringTrend[] }>('/analytics/hiring-trends'),
+    salaryDistribution: () => request<{ data: import('./types').SalaryBucket[] }>('/analytics/salary-distribution'),
+    topEmployers:       () => request<{ data: import('./types').TopEmployer[] }>('/analytics/top-employers'),
+  },
+
   contact: {
     send: (data: { name: string; email: string; subject: string; message: string }) =>
       request<{ message: string; status: number }>('/contact', {
