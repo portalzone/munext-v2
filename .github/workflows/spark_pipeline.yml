@@ -1,0 +1,60 @@
+name: Spark Analytics Pipeline
+
+on:
+  schedule:
+    - cron: '0 3 * * *'   # runs every day at 3am UTC
+  workflow_dispatch:        # allows manual trigger from GitHub UI
+
+jobs:
+  run-pipelines:
+    runs-on: ubuntu-latest
+
+    env:
+      DB_HOST:     ${{ secrets.DB_HOST }}
+      DB_PORT:     ${{ secrets.DB_PORT }}
+      DB_DATABASE: ${{ secrets.DB_DATABASE }}
+      DB_USERNAME: ${{ secrets.DB_USERNAME }}
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Java (required by Spark)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: pip install -r spark/requirements.txt
+
+      - name: Download MySQL JDBC driver
+        run: |
+          mkdir -p spark/jars
+          curl -L -o spark/jars/mysql-connector-j-9.7.0.jar \
+            https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/9.7.0/mysql-connector-j-9.7.0.jar
+
+      - name: Write .env for pipelines
+        run: |
+          cat > spark/.env <<EOF
+          DB_HOST=${{ secrets.DB_HOST }}
+          DB_PORT=${{ secrets.DB_PORT }}
+          DB_DATABASE=${{ secrets.DB_DATABASE }}
+          DB_USERNAME=${{ secrets.DB_USERNAME }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          EOF
+
+      - name: Run jobs_analytics pipeline
+        run: cd spark && python pipelines/jobs_analytics.py
+
+      - name: Run skills_demand pipeline
+        run: cd spark && python pipelines/skills_demand.py
+
+      - name: Run hiring_trends pipeline
+        run: cd spark && python pipelines/hiring_trends.py
