@@ -9,8 +9,10 @@ Download from: https://dev.mysql.com/downloads/connector/j/ (Platform Independen
 import os
 from pyspark.sql import SparkSession, DataFrame
 
-
-JDBC_DRIVER_PATH = "/spark/jars/mysql-connector-j-9.7.0.jar"
+# Resolves to spark/jars/ regardless of where the script runs (Docker or GitHub Actions)
+_UTILS_DIR  = os.path.dirname(os.path.abspath(__file__))
+_SPARK_ROOT = os.path.dirname(_UTILS_DIR)
+JDBC_DRIVER_PATH = os.path.join(_SPARK_ROOT, "jars", "mysql-connector-j-9.7.0.jar")
 
 
 def get_spark(app_name: str) -> SparkSession:
