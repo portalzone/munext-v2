@@ -10,12 +10,14 @@ Run locally:
 """
 
 import sys
+import os
 from datetime import datetime, timezone
 
-sys.path.insert(0, "/spark")
+SPARK_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, SPARK_ROOT)
 
 from dotenv import load_dotenv
-load_dotenv("/spark/.env")
+load_dotenv(os.path.join(SPARK_ROOT, ".env"))
 
 from utils.db_connector import get_spark, read_table, write_table
 from pyspark.sql import functions as F
