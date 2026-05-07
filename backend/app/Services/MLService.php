@@ -240,12 +240,18 @@ class MLService
 
         // EWMA trend: weekly job counts per category
         // Group postings by category + ISO week, then smooth with α = 0.3
+        // DATE_TRUNC is PostgreSQL-only; MySQL uses DATE_FORMAT to get Monday of each week
+        $isPgsql   = DB::getDriverName() === 'pgsql';
+        $weekExpr  = $isPgsql
+            ? "DATE_TRUNC('week', created_at)"
+            : "DATE_FORMAT(DATE_SUB(created_at, INTERVAL WEEKDAY(created_at) DAY), '%Y-%m-%d')";
+
         $weeklyRaw = DB::table('job_postings')
             ->whereNotNull('category')
-            ->selectRaw("category, DATE_TRUNC('week', created_at) as week, COUNT(*) as count")
-            ->groupBy('category', 'week')
+            ->selectRaw("category, {$weekExpr} as week, COUNT(*) as count")
+            ->groupByRaw("category, {$weekExpr}")
             ->orderBy('category')
-            ->orderBy('week')
+            ->orderByRaw($weekExpr)
             ->get();
 
         $ewmaByCategory = [];

@@ -12,3 +12,11 @@ docker-compose.override.yml
 *.tfstate
 *.tfstate.backup
 *.pem
+
+# Planning and session documents — keep off the repo
+*_CLAUDE.md
+AGENTS.md
+*_Interview_Prep.md
+*_Sprint_Plan*.pdf
+*.sprint.md
+.claude/
