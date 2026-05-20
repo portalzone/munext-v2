@@ -1,9 +1,20 @@
 # MUNext v2
 
-A professional job board platform connecting Memorial University students with employers.
-Students browse jobs, check skill match scores, apply with cover letters, and track application status.
-Employers post jobs and manage applicants through a hiring pipeline. Admins moderate the platform and view ML analytics.
-A daily Spark pipeline computes market analytics (skills demand, hiring trends, salary distribution) and surfaces them on a live dashboard.
+**Live at [munext.basepan.com](https://munext.basepan.com)**
+
+MUNext is a full-stack job board built for Memorial University students, alumni, and employers. Students discover relevant jobs through a skill match score, apply with cover letters, and track application status in real time. Employers manage their hiring pipeline and message applicants directly. A daily Apache Spark pipeline analyses job market trends and surfaces them on a live Recharts dashboard — no manual data refresh needed.
+
+Built as a portfolio project to demonstrate end-to-end software engineering: modular Laravel API, Next.js frontend, 5 pure-PHP ML algorithms, PySpark data pipelines, and GitHub Actions automation.
+
+## Screenshots
+
+| Job Listings | Job Detail + Skill Match |
+|---|---|
+| ![Job listings page](docs/screenshots/jobs.png) | ![Job detail with skill match](docs/screenshots/job-detail.png) |
+
+| Analytics Dashboard | Admin ML Panel |
+|---|---|
+| ![Analytics dashboard](docs/screenshots/analytics.png) | ![Admin ML analytics](docs/screenshots/admin-ml.png) |
 
 ## Tech Stack
 
@@ -265,6 +276,31 @@ All routes prefixed `/api/v1/`. Sanctum token in `Authorization: Bearer <token>`
 | GET | /analytics/salary-distribution | Active jobs bucketed by salary range |
 | GET | /analytics/top-employers | Top 10 employers by active job count |
 
+**Example — `GET /api/v1/analytics/skills-demand`**
+```json
+{
+  "data": [
+    { "skill": "Python", "count": 12, "trend": "up",     "computed_at": "2026-05-19T03:12:00Z" },
+    { "skill": "SQL",    "count": 9,  "trend": "stable", "computed_at": "2026-05-19T03:12:00Z" },
+    { "skill": "AWS",    "count": 6,  "trend": "down",   "computed_at": "2026-05-19T03:12:00Z" }
+  ],
+  "message": "Skills demand retrieved successfully",
+  "status": 200
+}
+```
+
+**Example — `GET /api/v1/analytics/hiring-trends`**
+```json
+{
+  "data": [
+    { "month": "2026-03", "job_count": 8,  "application_count": 14, "computed_at": "2026-05-19T03:12:00Z" },
+    { "month": "2026-04", "job_count": 15, "application_count": 31, "computed_at": "2026-05-19T03:12:00Z" }
+  ],
+  "message": "Hiring trends retrieved successfully",
+  "status": 200
+}
+```
+
 ### ML Algorithms (pure PHP)
 | Method | Endpoint | Access | Algorithm |
 |---|---|---|---|
@@ -435,6 +471,30 @@ An admin must approve the employer account first. Log in as admin, go to the Use
 
 **Spark pipeline fails on GitHub Actions**
 Check the Actions log. Common causes: DB secrets not set, Hostinger Remote MySQL "Any Host" not enabled, or JDBC JAR download failed (Maven Central timeout — retry the run).
+
+## Quick Start (5 commands)
+
+```bash
+git clone https://github.com/portalzone/munext-v2.git && cd munext-v2
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env.local
+docker compose up --build
+docker compose exec app php artisan migrate
+```
+
+App is running at http://localhost:3001. API at http://localhost:8000/api/v1.
+
+## Contributing
+
+This is a portfolio project but contributions and feedback are welcome.
+
+1. Fork the repo and create a branch: `git checkout -b feat/your-feature`
+2. Follow the existing module pattern — one folder per domain under `backend/Modules/`
+3. Every new endpoint needs a Pest test: `docker compose exec app php artisan test`
+4. All tests must pass before opening a PR
+5. Keep commit messages conventional: `feat:`, `fix:`, `chore:`
+
+For bugs or suggestions open a GitHub issue.
 
 ## Contact
 

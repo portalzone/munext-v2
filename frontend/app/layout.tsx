@@ -16,8 +16,30 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MUNext v2",
-  description: "Connecting MUN students with employers",
+  title: "MUNext — Job Board Portal",
+  description: "Job board platform connecting Memorial University students and alumni with employers across Newfoundland.",
+  metadataBase: new URL("https://munext.basepan.com"),
+  openGraph: {
+    title: "MUNext — Job Board Portal",
+    description: "Job board platform connecting Memorial University students and alumni with employers across Newfoundland.",
+    url: "https://munext.basepan.com",
+    siteName: "MUNext",
+    type: "website",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "MUNext Job Board",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "MUNext — Job Board Portal",
+    description: "Job board platform connecting Memorial University students and alumni with employers.",
+    images: ["/og-image.png"],
+  },
 };
 
 export default function RootLayout({
