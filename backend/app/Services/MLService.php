@@ -14,8 +14,8 @@ class MLService
     // ─────────────────────────────────────────────
     public function skillMatch(array $studentSkills, array $jobSkills): array
     {
-        $a = array_map('strtolower', array_map('trim', $studentSkills));
-        $b = array_map('strtolower', array_map('trim', $jobSkills));
+        $a = array_values(array_unique(array_map('strtolower', array_map('trim', $studentSkills))));
+        $b = array_values(array_unique(array_map('strtolower', array_map('trim', $jobSkills))));
 
         $intersection = array_values(array_intersect($a, $b));
         $union        = array_values(array_unique(array_merge($a, $b)));
@@ -23,7 +23,7 @@ class MLService
         $extra        = array_values(array_diff($a, $b));
 
         $score = count($union) > 0
-            ? round((count($intersection) / count($union)) * 100)
+            ? (int) round((count($intersection) / count($union)) * 100)
             : 0;
 
         return [
@@ -45,7 +45,7 @@ class MLService
         // Component 1 — profile completeness (30 pts)
         $fields      = ['program', 'gpa', 'graduation_year'];
         $filled      = $profile ? count(array_filter($fields, fn($f) => !empty($profile->$f))) : 0;
-        $completeness = $profile ? round(($filled / count($fields)) * 30) : 0;
+        $completeness = $profile ? (int) round(($filled / count($fields)) * 30) : 0;
 
         // Component 2 — skills count (25 pts, capped at 10 skills)
         $skillCount = $profile ? count($profile->skills ?? []) : 0;
@@ -115,9 +115,9 @@ class MLService
                     'hired'       => (int) $counts->hired,
                 ],
                 'conversion_rates' => [
-                    'to_reviewed'    => $total > 0 ? round(($counts->reviewed    / $total) * 100) : 0,
-                    'to_shortlisted' => $total > 0 ? round(($counts->shortlisted / $total) * 100) : 0,
-                    'to_hired'       => $total > 0 ? round(($counts->hired       / $total) * 100) : 0,
+                    'to_reviewed'    => $total > 0 ? (int) round(($counts->reviewed    / $total) * 100) : 0,
+                    'to_shortlisted' => $total > 0 ? (int) round(($counts->shortlisted / $total) * 100) : 0,
+                    'to_hired'       => $total > 0 ? (int) round(($counts->hired       / $total) * 100) : 0,
                 ],
             ];
         }
@@ -161,7 +161,7 @@ class MLService
             ? ($employerStats->hired / $employerStats->total) * 100
             : 50; // default 50% when employer has no history
 
-        $probability = round(
+        $probability = (int) round(
             ($matchScore * 0.35) + ($profileScore * 0.25) + ($hireRate * 0.40)
         );
 
@@ -192,7 +192,7 @@ class MLService
             'factors'     => [
                 'skill_match'   => $matchScore,
                 'profile'       => $profileScore,
-                'selectivity'   => round($hireRate),
+                'selectivity'   => (int) round($hireRate),
             ],
             'suggestions' => array_slice($suggestions, 0, 3),
         ];
