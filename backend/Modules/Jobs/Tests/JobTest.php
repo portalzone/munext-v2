@@ -54,7 +54,7 @@ it('allows any authenticated user to view a single job posting', function () {
 // --- Store ---
 
 it('allows an employer to create a job posting', function () {
-    $employer = User::factory()->create(['role' => 'employer']);
+    $employer = User::factory()->create(['role' => 'employer', 'employer_approved' => true]);
 
     $response = $this->actingAs($employer)->postJson('/api/v1/jobs', [
         'title'            => 'Backend Developer',
@@ -82,8 +82,21 @@ it('prevents a student from creating a job posting', function () {
     $response->assertStatus(403);
 });
 
-it('fails to create a job posting when required fields are missing', function () {
+it('prevents an unapproved employer from creating a job posting', function () {
     $employer = User::factory()->create(['role' => 'employer']);
+
+    $response = $this->actingAs($employer)->postJson('/api/v1/jobs', [
+        'title'            => 'Backend Developer',
+        'description'      => 'Laravel experience required.',
+        'skills_required'  => ['PHP'],
+        'experience_level' => 'entry',
+    ]);
+
+    $response->assertStatus(403);
+});
+
+it('fails to create a job posting when required fields are missing', function () {
+    $employer = User::factory()->create(['role' => 'employer', 'employer_approved' => true]);
 
     $response = $this->actingAs($employer)->postJson('/api/v1/jobs', []);
 
