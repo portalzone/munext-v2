@@ -230,6 +230,23 @@ docker compose exec app php artisan test
 
 All Pest tests must pass before any feature is considered done. Each endpoint has at minimum: happy path, unauthenticated access, and invalid input tests.
 
+### Algorithm Test Suite
+
+The five scoring algorithms in `MLService.php` (skill matching, profile strength, hiring funnel, success prediction, market trends) have a dedicated unit test suite built with boundary value analysis, equivalence partitioning, and mutation testing.
+
+```bash
+# From backend/, with the Postgres container running and migrated
+
+vendor/bin/pest tests/Unit/Algorithms
+
+# Line coverage (requires Xdebug)
+vendor/bin/pest --coverage-html=coverage-report
+
+# Mutation testing (requires the test DB to be reachable — the baseline
+# suite runs first, then each mutant is tested against it)
+vendor/bin/pest --mutate --class="App\Services\MLService"
+```
+
 ## API Endpoints
 
 All routes prefixed `/api/v1/`. Sanctum token in `Authorization: Bearer <token>` header.

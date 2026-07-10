@@ -29,7 +29,7 @@ LITERATURE_SUMMARY.md
 REPORT_DRAFT.md
 SLIDES_DRAFT.md
 bugs-found.md
-Course Project*.pdf
+*Course Project*.pdf
 backend/coverage-report/
 backend/mutation-report/
 backend/infection.json5
