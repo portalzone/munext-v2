@@ -15,8 +15,22 @@ docker-compose.override.yml
 
 # Planning and session documents — keep off the repo
 *_CLAUDE.md
+CLAUDE.md
+CLAUDE_ACENET.md
 AGENTS.md
 *_Interview_Prep.md
 *_Sprint_Plan*.pdf
 *.sprint.md
 .claude/
+
+# Personal working documents — not portfolio content
+fixclaude.md
+LITERATURE_SUMMARY.md
+REPORT_DRAFT.md
+SLIDES_DRAFT.md
+bugs-found.md
+Course Project*.pdf
+backend/coverage-report/
+backend/mutation-report/
+backend/infection.json5
+new project2.zip
